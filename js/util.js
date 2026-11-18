@@ -37,3 +37,23 @@ export function enlazarMonto(raiz) {
     });
   });
 }
+
+// Entrega un archivo: hoja de compartir del iPhone si existe; si no, descarga.
+// Devuelve 'ok' | 'cancelado' | 'descargado'.
+export async function compartirArchivo(nombre, contenido, tipo, titulo) {
+  const archivo = new File([contenido], nombre, { type: tipo });
+  if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+    try {
+      await navigator.share({ files: [archivo], title: titulo });
+      return 'ok';
+    } catch (e) {
+      if (e.name === 'AbortError') return 'cancelado';
+    }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(archivo);
+  a.download = nombre;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  return 'descargado';
+}

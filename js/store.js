@@ -9,7 +9,7 @@ export const estadoInicial = () => ({
   deudas: [],
   pagos: [],
   compras: [],
-  ajustes: { moneda: 'COP', ultimoRespaldo: null }
+  ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 } }
 });
 
 // Completa campos que falten en datos guardados por versiones anteriores.
@@ -21,6 +21,7 @@ export function migrar(estado) {
   e.pagos = Array.isArray(e.pagos) ? e.pagos : [];
   e.compras = Array.isArray(e.compras) ? e.compras : [];
   e.ajustes = { ...base.ajustes, ...(estado.ajustes || {}) };
+  e.ajustes.recordatorio = { ...base.ajustes.recordatorio, ...(e.ajustes.recordatorio || {}) };
   e.deudas.forEach((d) => { if (!Array.isArray(d.historial)) d.historial = []; });
   return e;
 }

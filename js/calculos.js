@@ -53,3 +53,28 @@ export const parseTasa = (txt) => {
   const n = Number(String(txt || '').replace(',', '.').replace(/[^\d.]/g, ''));
   return Number.isFinite(n) ? n : 0;
 };
+
+// Pago programado de una deuda en un mes dado (y = año, m = mes 0-11).
+// estado: 'pagada' | 'vencida' | 'pendiente' | 'programada' | 'omitida' (mes pasado sin abono registrado)
+export function ocurrencia(d, estado, y, m, hoy = new Date()) {
+  if (!d.dia || !d.cuota) return null;
+  const fecha = vence(y, m, d.dia);
+  const desde = d.planDesde ? inicioDia(new Date(d.planDesde)) : null;
+  if (desde && inicioDia(fecha) < desde) return null;
+
+  const off = (y - hoy.getFullYear()) * 12 + (m - hoy.getMonth());
+  if (off < 0) {
+    const pagado = abonadoMes(estado, d.id, new Date(y, m, 1));
+    return { fecha, monto: d.cuota, estado: pagado >= d.cuota ? 'pagada' : 'omitida' };
+  }
+  if (off === 0) {
+    const s = situacion(d, estado, hoy);
+    if (s.liquidada && s.pagadoMes === 0) return null;
+    if (s.liquidada || s.pendiente === 0) return { fecha, monto: d.cuota, estado: 'pagada' };
+    return { fecha, monto: s.pendiente, estado: inicioDia(fecha) < inicioDia(hoy) ? 'vencida' : 'pendiente' };
+  }
+  if (d.saldo <= 0) return null;
+  const p = proyeccion(d.saldo, d.tasa, d.cuota, hoy);
+  if (p && !p.imposible && off > p.meses) return null;
+  return { fecha, monto: d.cuota, estado: 'programada' };
+}

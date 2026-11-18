@@ -1,10 +1,12 @@
 // Saldar - Paso 1: base de la app, perfiles con PIN, almacenamiento cifrado y estructura.
 import * as store from './store.js';
-import { esc, fechaLarga } from './util.js';
+import { esc, fechaLarga, compartirArchivo } from './util.js';
+import * as calendarioUI from './calendario-ui.js';
+import { respaldoICS } from './ics.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.3.3';
+const VERSION_APP = '0.4.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -27,6 +29,7 @@ function aviso(texto) {
 
 async function pantallaPerfiles() {
   sesion = null;
+  calendarioUI.reiniciar();
   const perfiles = await store.listarPerfiles();
   if (perfiles.length === 0) return nuevoPerfil();
 
@@ -211,6 +214,7 @@ function pantallaPrincipal() {
   const c = document.getElementById('contenido');
   if (pestana === 'inicio') deudasUI.inicio(ctx, c);
   else if (pestana === 'deudas') deudasUI.lista(ctx, c);
+  else if (pestana === 'calendario') calendarioUI.calendario(ctx, c);
   else {
     c.innerHTML = VISTAS[pestana]();
     if (pestana === 'ajustes') enlazarAjustes();
@@ -224,7 +228,6 @@ function proximamente(titulo, texto, paso) {
 }
 
 const VISTAS = {
-  calendario: () => proximamente('Calendario', 'Los vencimientos del mes y tus recordatorios.', 'Paso 3'),
   compras: () => proximamente('Compras', 'Pagos con tarjeta capturados por Apple Pay o por el SMS del banco.', 'Paso 4'),
   ajustes() {
     const ult = sesion.estado.ajustes.ultimoRespaldo;
@@ -234,7 +237,6 @@ const VISTAS = {
         <div class="ajuste"><span>Perfil</span><b>${esc(sesion.nombre)}</b></div>
         <div class="ajuste"><span>Moneda</span><b>${esc(sesion.estado.ajustes.moneda)}</b></div>
         <div class="ajuste"><span>Versión</span><b>Saldar ${VERSION_APP}</b></div>
-        <div class="ajuste"><span>Pantalla</span><b id="diag" style="font-size:13px;text-align:right">…</b></div>
       </div>
       <div class="seccion">Tus datos</div>
       <div class="card">
@@ -244,6 +246,7 @@ const VISTAS = {
       </div>
       <button class="btn" id="respaldar" style="max-width:none;margin-top:0">Exportar respaldo</button>
       <button class="btn sec" id="restaurar" style="max-width:none">Restaurar desde un archivo</button>
+      <button class="btn sec" id="recordar" style="max-width:none">Recordarme el respaldo cada mes</button>
       <div class="seccion">Aplicación</div>
       <button class="btn sec" id="actualizar" style="max-width:none;margin-top:0">Buscar actualización</button>
       <button class="btn" id="bloquear" style="max-width:none">Bloquear ahora</button>
@@ -315,21 +318,13 @@ async function buscarActualizacion() {
 }
 
 function enlazarAjustes() {
-  // Diagnóstico de pantalla (para ajustar la barra inferior en el iPhone).
-  const sonda = document.createElement('div');
-  sonda.style.cssText = 'position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top)';
-  document.body.appendChild(sonda);
-  const cs = getComputedStyle(sonda);
-  const barra = document.querySelector('nav').getBoundingClientRect();
-  const vh = (u) => { const t = document.createElement('div'); t.style.cssText = `position:fixed;visibility:hidden;height:${u}`; document.body.appendChild(t); const h = Math.round(t.getBoundingClientRect().height); t.remove(); return h; };
-  const vv = window.visualViewport;
-  document.getElementById('diag').innerHTML =
-    `pantalla ${screen.width}×${screen.height}<br>ventana ${innerWidth}×${innerHeight}<br>visual ${Math.round(vv?.width || 0)}×${Math.round(vv?.height || 0)}<br>` +
-    `seguro arriba ${cs.paddingTop} abajo ${cs.paddingBottom}<br>fin barra ${Math.round(barra.bottom)} · falta ${getComputedStyle(document.documentElement).getPropertyValue('--falta')} · 100vh ${vh('100vh')} · 100lvh ${vh('100lvh')} · 100dvh ${vh('100dvh')} · scrollY ${Math.round(scrollY)} · vv.top ${Math.round(vv?.offsetTop || 0)} · modo ${navigator.standalone ? 'app' : 'safari'}`;
-  sonda.remove();
   navigator.storage?.persisted?.().then((p) => { const el = document.getElementById('persist'); if (el) el.textContent = p ? 'Sí' : 'No'; });
   document.getElementById('respaldar').onclick = exportarRespaldo;
   document.getElementById('restaurar').onclick = elegirRespaldo;
+  document.getElementById('recordar').onclick = async () => {
+    const r = await compartirArchivo('Saldar-recordatorio-respaldo.ics', respaldoICS(), 'text/calendar', 'Recordatorio de respaldo');
+    aviso(r === 'cancelado' ? 'Cancelado' : 'Recordatorio listo para el Calendario');
+  };
   document.getElementById('actualizar').onclick = buscarActualizacion;
   document.getElementById('bloquear').onclick = bloquear;
   document.getElementById('cambiar').onclick = bloquear;

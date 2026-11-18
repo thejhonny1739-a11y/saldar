@@ -173,3 +173,25 @@ nav button.activo { color: var(--menta); }
 
 .alerta.info { display: block; width: 100%; text-align: left; background: rgba(139, 92, 246, .12); border-color: var(--morado); color: #c3b0ff; }
 .nota { color: var(--suave); font-size: 13px; line-height: 1.45; margin: 12px 0 2px; }
+
+/* ---------- Calendario ---------- */
+.mes-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 18px; }
+.flecha { width: 40px; height: 40px; border-radius: 50%; background: var(--card-2); font-size: 24px; line-height: 1; }
+.semana, .cuadricula { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.semana { margin-bottom: 6px; text-align: center; font-size: 12px; color: var(--suave); }
+.dia { aspect-ratio: 1 / 1.05; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 15px; background: transparent; }
+.dia.vacio { pointer-events: none; }
+.dia:active { background: var(--card-2); }
+.dia.hoy { border: 1.5px solid var(--menta); }
+.dia.sel { background: var(--card-2); border: 1.5px solid var(--morado); }
+.puntos-dia { display: flex; gap: 3px; height: 6px; }
+.puntos-dia i, .leyenda i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.p-menta { background: var(--menta); } .p-rosa { background: var(--rosa); } .p-ambar { background: var(--ambar); } .p-morado { background: var(--morado); }
+.deuda-pie.morado { color: #b79cff; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 12px; font-size: 12px; color: var(--suave); align-items: center; }
+.leyenda i { margin-right: -8px; }
+.sel-chico { padding: 8px 10px; font-size: 16px; color: var(--texto); background: var(--card-2); border: 1px solid var(--borde); border-radius: 10px; appearance: none; -webkit-appearance: none; }
+
+/* Pantallas anchas (iPad, escritorio): columna centrada como en el teléfono */
+.contenido, nav { width: 100%; max-width: 560px; align-self: center; }
+.acceso { max-width: 560px; width: 100%; align-self: center; }
