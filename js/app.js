@@ -7,7 +7,7 @@ import { respaldoICS } from './ics.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.5.0';
+const VERSION_APP = '0.6.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -198,6 +198,7 @@ function pantallaPrincipal() {
     const cont = document.getElementById('contenido');
     if (sub.vista === 'detalle') deudasUI.detalle(ctx, cont, sub.id);
     else if (sub.vista === 'compra') comprasUI.formulario(ctx, cont, sub.id);
+    else if (sub.vista === 'guia') comprasUI.guia(ctx, cont);
     else deudasUI.formulario(ctx, cont, sub.id);
     cont.scrollTop = 0;
     return;

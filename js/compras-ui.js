@@ -2,6 +2,7 @@
 import { esc, pesos, miles, fechaCorta, desdeISO, modal, enlazarMonto } from './util.js';
 import * as L from './lector.js';
 import { aISO, parseMonto } from './calculos.js';
+import { analizar } from './capturas.js';
 
 let borrador = null; // datos pre-llenados (por ejemplo desde un mensaje leído)
 
@@ -25,7 +26,7 @@ export function lista(ctx, c) {
     }
     grupos += `<button class="deuda" data-id="${esc(x.id)}">
       <div class="deuda-top"><span class="deuda-nombre">${esc(x.comercio)}</span><span class="deuda-monto">${pesos(x.monto)}</span></div>
-      <div class="deuda-sub">${esc(x.categoria)}${x.tarjeta ? ` · •••• ${esc(x.tarjeta)}` : ''}</div></button>`;
+      <div class="deuda-sub">${esc(x.categoria)}${x.tarjeta ? ` · •••• ${esc(x.tarjeta)}` : x.tarjetaNombre ? ` · ${esc(x.tarjetaNombre)}` : ''}${x.revisar ? ' · <b class="ambar">Revisar</b>' : ''}</div></button>`;
   }
 
   c.innerHTML = `
@@ -33,11 +34,15 @@ export function lista(ctx, c) {
     <div class="card"><div class="etiqueta">Gastado este mes</div><div class="cifra">${pesos(totalMes)}</div>
       <div class="deuda-sub">${delMes.length} ${delMes.length === 1 ? 'compra' : 'compras'}</div></div>
     <button class="btn sec" id="pegar" style="max-width:none;margin-top:0">Leer un mensaje del banco</button>
+    <button class="btn sec" id="importar" style="max-width:none">Importar del atajo</button>
+    <button class="enlace" id="guia" style="margin:0 auto 6px">Cómo configurar la captura automática</button>
     ${e.compras.length === 0 ? '<div class="card vacio" style="margin-top:14px"><b>Sin compras registradas</b>Agrégalas a mano o pega el SMS o correo del banco y Saldar lo lee por ti.</div>' : grupos}
     ${(e.sinEntender || []).length ? `<button class="enlace" id="sin" style="margin:18px auto">Mensajes que no entendí (${e.sinEntender.length})</button>` : ''}`;
 
   c.querySelector('#nueva').onclick = () => { borrador = null; ctx.ir('compras', { vista: 'compra' }); };
   c.querySelector('#pegar').onclick = () => modalPegar(ctx);
+  c.querySelector('#importar').onclick = () => importarArchivos(ctx);
+  c.querySelector('#guia').onclick = () => ctx.ir('compras', { vista: 'guia' });
   c.querySelectorAll('.deuda[data-id]').forEach((b) => { b.onclick = () => ctx.ir('compras', { vista: 'compra', id: b.dataset.id }); });
   const sin = c.querySelector('#sin');
   if (sin) sin.onclick = () => modalSinEntender(ctx);
@@ -113,6 +118,7 @@ export function formulario(ctx, c, id) {
   c.innerHTML = `
     <div class="encabezado"><button class="atras" id="atras">‹ Compras</button></div>
     <h1>${x ? 'Editar compra' : leido ? 'Confirma la compra' : 'Nueva compra'}</h1>
+    ${x && x.revisar ? '<div class="alerta" style="margin-top:8px">Falta revisar esta compra (no se pudo leer el comercio). Corrígelo y guarda.</div>' : ''}
     ${leido ? `<div class="alerta info" style="margin-top:8px">${b.completo ? 'Leí estos datos del mensaje. Revísalos antes de guardar.' : 'Leí lo que pude del mensaje. Completa o corrige lo que falte.'}</div>` : ''}
     <form id="f" class="formulario">
       <label>Comercio<input name="comercio" maxlength="40" value="${esc(v.comercio)}" placeholder="Ej: Éxito" autocomplete="off" required></label>
@@ -145,7 +151,7 @@ export function formulario(ctx, c, id) {
       if (repetida && !confirm('Ya registraste una compra igual (misma fecha, monto y comercio). ¿Guardarla de todos modos?')) return;
       e.compras.push({ id: crypto.randomUUID(), ...nueva, origen: leido ? 'texto' : 'manual', creada: Date.now() });
     } else {
-      Object.assign(x, nueva);
+      Object.assign(x, nueva, { revisar: false });
     }
     e.aprendido.comercios[L.normalizar(nueva.comercio)] = nueva.categoria;
     await ctx.guardar();
@@ -162,4 +168,101 @@ export function formulario(ctx, c, id) {
     ctx.aviso('Compra eliminada');
     ctx.ir('compras', null);
   };
+}
+
+/* ================= Importar capturas de los Atajos ================= */
+
+function importarArchivos(ctx) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.multiple = true;
+  inp.accept = '.txt,text/plain';
+  inp.onchange = async () => {
+    const archivos = [...inp.files];
+    if (!archivos.length) return;
+    try {
+      const textos = await Promise.all(archivos.map((f) => f.text()));
+      modalResumen(ctx, analizar(textos, ctx.sesion().estado));
+    } catch {
+      ctx.aviso('No pude leer los archivos.');
+    }
+  };
+  inp.click();
+}
+
+function modalResumen(ctx, r) {
+  const e = ctx.sesion().estado;
+  const hay = r.nuevas.length > 0;
+  const m = modal(`
+    <h2>${r.total === 0 ? 'No encontré capturas' : 'Capturas encontradas'}</h2>
+    ${r.total === 0 ? '<p class="nota" style="margin-top:0">El archivo no tiene capturas de Saldar. Revisa que elegiste los archivos que crea el atajo.</p>' : `
+    <div class="card" style="font-size:15px;line-height:1.7">
+      <div class="ajuste"><span>Compras nuevas</span><b>${r.nuevas.length}</b></div>
+      <div class="ajuste"><span>Ya registradas</span><b>${r.repetidas}</b></div>
+      <div class="ajuste"><span>Ingresos (se ignoran)</span><b>${r.ingresos}</b></div>
+      <div class="ajuste"><span>No entendidas</span><b>${r.ilegibles.length}</b></div>
+    </div>
+    ${hay ? `<div style="max-height:32vh;overflow-y:auto;margin-bottom:12px">${r.nuevas.map((c) => `
+      <div class="hist"><div><b>${esc(c.comercio)}</b>${c.revisar ? ' <span class="ambar">· Revisar</span>' : ''}<div class="hist-n">${esc(c.categoria)}${c.tarjeta ? ` · •••• ${esc(c.tarjeta)}` : ''}</div></div>
+      <div style="text-align:right"><b>${pesos(c.monto)}</b><div class="hist-n">${esc(fechaCorta(desdeISO(c.fecha)))}</div></div></div>`).join('<div class="sep"></div>')}</div>` : ''}`}
+    ${r.total > 0 && (hay || r.ilegibles.length || r.ingresos) ? `<button class="btn" id="ok" style="max-width:none">${hay ? `Guardar ${r.nuevas.length} ${r.nuevas.length === 1 ? 'compra' : 'compras'}` : 'Listo'}</button>` : ''}
+    <button class="volver" id="no" type="button" style="width:100%">${r.total === 0 ? 'Cerrar' : 'Cancelar'}</button>`);
+  m.el.querySelector('#no').onclick = m.cerrar;
+  const ok = m.el.querySelector('#ok');
+  if (ok) ok.onclick = async () => {
+    const ahora = Date.now();
+    r.nuevas.forEach((c, i) => e.compras.push({ id: crypto.randomUUID(), ...c, nota: '', creada: ahora + i }));
+    r.ilegibles.forEach((t) => { e.sinEntender = [{ id: crypto.randomUUID(), f: ahora, texto: t.slice(0, 600) }, ...(e.sinEntender || [])].slice(0, 30); });
+    e.capturasVistas = [...(e.capturasVistas || []), ...r.hashes].slice(-3000);
+    await ctx.guardar();
+    m.cerrar();
+    ctx.aviso(hay ? `${r.nuevas.length} compras guardadas` : 'Listo');
+    ctx.ir('compras', null);
+  };
+}
+
+/* ================= Guía de atajos ================= */
+
+export function guia(ctx, c) {
+  c.innerHTML = `
+    <div class="encabezado"><button class="atras" id="atras">‹ Compras</button></div>
+    <h1>Captura automática</h1>
+    <p class="saludo">Dos atajos de iPhone anotan tus compras en un archivo. Luego las importas en Saldar con un toque. Los nombres de los botones pueden variar un poco según tu versión de iOS.</p>
+
+    <div class="seccion">Antes de empezar</div>
+    <div class="card"><ol class="pasos">
+      <li>Abre la app <b>Archivos</b> y crea una carpeta llamada <b>Saldar</b> en <b>iCloud Drive</b>.</li>
+      <li>Cada atajo guardará un archivo de texto ahí por cada compra.</li>
+    </ol></div>
+
+    <div class="seccion">Atajo 1 · Pagos con Apple Pay</div>
+    <div class="card"><ol class="pasos">
+      <li>Abre <b>Atajos</b> &gt; pestaña <b>Automatización</b> &gt; <b>+</b> &gt; <b>Transacción</b>.</li>
+      <li>Elige las tarjetas de Wallet que quieras vigilar. Marca <b>Ejecutar inmediatamente</b> y toca <b>Siguiente</b>.</li>
+      <li>Agrega la acción <b>Texto</b> y escribe, en una sola línea, estas partes separadas por la barra <b>|</b>:<br>
+        <code>#SALDAR#ap|</code> <b>Fecha actual</b> <code>|</code> <b>Importe</b> <code>|</code> <b>Comerciante</b> <code>|</code> <b>Tarjeta o pase</b><br>
+        Las partes en negrita son variables: tócalas en la barra de variables y elige las de la transacción. En <b>Fecha actual</b> usa el formato <b>ISO 8601</b>.</li>
+      <li>Agrega la acción <b>Guardar archivo</b>: carpeta <b>Saldar</b>, desactiva <b>Preguntar dónde guardar</b> y nombra el archivo con la <b>Fecha actual</b> formateada <code>yyyyMMdd-HHmmss</code> más <code>.txt</code>.</li>
+      <li>Toca <b>Listo</b>. En el próximo pago con Apple Pay, el archivo aparece solo.</li>
+    </ol></div>
+
+    <div class="seccion">Atajo 2 · SMS del banco</div>
+    <div class="card"><ol class="pasos">
+      <li><b>Automatización</b> &gt; <b>+</b> &gt; <b>Mensaje</b>.</li>
+      <li>En <b>Remitente</b> elige el número del banco, o en <b>Mensaje contiene</b> escribe <b>compra</b>. Así solo se copian mensajes de compras y no tus chats. Marca <b>Ejecutar inmediatamente</b>.</li>
+      <li>Acción <b>Texto</b>: <code>#SALDAR#msg|</code> <b>Fecha actual</b> (ISO 8601) <code>|</code> <b>Entrada del atajo</b> (el contenido del mensaje).</li>
+      <li>Acción <b>Guardar archivo</b>, igual que en el atajo 1.</li>
+      <li>Para correos del banco, haz lo mismo con la automatización <b>Correo</b>, eligiendo el remitente.</li>
+    </ol></div>
+
+    <div class="seccion">Importar en Saldar</div>
+    <div class="card"><ol class="pasos">
+      <li>En <b>Compras</b> toca <b>Importar del atajo</b>.</li>
+      <li>Abre la carpeta <b>Saldar</b>, toca <b>Seleccionar</b> y elige todos los archivos.</li>
+      <li>Saldar te muestra cuántas compras nuevas encontró. Toca <b>Guardar</b>.</li>
+    </ol>
+    <p class="nota">Si una compra llega por Apple Pay y por SMS, Saldar la cuenta una sola vez. Las compras sin comercio quedan marcadas <b class="ambar">Revisar</b>. Importar dos veces el mismo archivo no duplica nada.</p></div>
+
+    <p class="nota">Los archivos contienen el texto de tus mensajes del banco y quedan en tu iCloud Drive. Después de importar puedes borrarlos de la carpeta.</p>`;
+  c.querySelector('#atras').onclick = () => ctx.ir('compras', null);
 }

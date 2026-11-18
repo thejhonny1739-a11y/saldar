@@ -200,3 +200,7 @@ nav button.activo { color: var(--menta); }
 
 .pasos { margin: 0 0 12px; padding-left: 22px; line-height: 1.5; }
 .pasos li { margin-bottom: 8px; }
+
+.ambar { color: var(--ambar); }
+code { background: var(--card-2); padding: 1px 6px; border-radius: 6px; font-size: 13px; word-break: break-all; user-select: text; -webkit-user-select: text; }
+.pasos code { display: inline-block; margin: 2px 0; }
