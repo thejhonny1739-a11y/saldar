@@ -1,12 +1,13 @@
 // Saldar - Paso 1: base de la app, perfiles con PIN, almacenamiento cifrado y estructura.
 import * as store from './store.js';
-import { esc, fechaLarga, entregarICS } from './util.js';
+import { esc, fechaLarga, entregarICS, modal } from './util.js';
+import * as comprasUI from './compras-ui.js';
 import * as calendarioUI from './calendario-ui.js';
 import { respaldoICS } from './ics.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.4.2';
+const VERSION_APP = '0.5.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -196,6 +197,7 @@ function pantallaPrincipal() {
     app.innerHTML = '<div class="contenido" id="contenido"></div>';
     const cont = document.getElementById('contenido');
     if (sub.vista === 'detalle') deudasUI.detalle(ctx, cont, sub.id);
+    else if (sub.vista === 'compra') comprasUI.formulario(ctx, cont, sub.id);
     else deudasUI.formulario(ctx, cont, sub.id);
     cont.scrollTop = 0;
     return;
@@ -215,6 +217,7 @@ function pantallaPrincipal() {
   if (pestana === 'inicio') deudasUI.inicio(ctx, c);
   else if (pestana === 'deudas') deudasUI.lista(ctx, c);
   else if (pestana === 'calendario') calendarioUI.calendario(ctx, c);
+  else if (pestana === 'compras') comprasUI.lista(ctx, c);
   else {
     c.innerHTML = VISTAS[pestana]();
     if (pestana === 'ajustes') enlazarAjustes();
@@ -228,7 +231,6 @@ function proximamente(titulo, texto, paso) {
 }
 
 const VISTAS = {
-  compras: () => proximamente('Compras', 'Pagos con tarjeta capturados por Apple Pay o por el SMS del banco.', 'Paso 4'),
   ajustes() {
     const ult = sesion.estado.ajustes.ultimoRespaldo;
     return `
@@ -255,7 +257,23 @@ const VISTAS = {
   }
 };
 
-async function exportarRespaldo() {
+// Explica cómo guardar el respaldo y luego abre la hoja de compartir.
+function exportarRespaldo() {
+  const m = modal(`
+    <h2>Exportar respaldo</h2>
+    <ol class="pasos">
+      <li>Se abre la hoja de compartir. Toca <b>Guardar en Archivos</b>.</li>
+      <li>Elige <b>iCloud Drive</b> (así sobrevive aunque cambies o pierdas el teléfono) y toca <b>Guardar</b>.</li>
+      <li>Para recuperarlo: <b>Ajustes &gt; Restaurar desde un archivo</b> y elige ese archivo.</li>
+    </ol>
+    <p class="nota">El archivo va cifrado con tu PIN: sin el PIN nadie puede abrirlo, ni tú.</p>
+    <button class="btn" id="seguir" style="max-width:none">Continuar</button>
+    <button class="volver" id="no" type="button" style="width:100%">Cancelar</button>`);
+  m.el.querySelector('#no').onclick = m.cerrar;
+  m.el.querySelector('#seguir').onclick = () => { m.cerrar(); hacerRespaldo(); };
+}
+
+async function hacerRespaldo() {
   try {
     const datos = await store.exportarPerfil(sesion.id);
     const nombreArchivo = `Saldar-respaldo-${sesion.nombre.replace(/[^\w-]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.json`;

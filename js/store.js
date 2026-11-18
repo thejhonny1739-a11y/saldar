@@ -9,6 +9,8 @@ export const estadoInicial = () => ({
   deudas: [],
   pagos: [],
   compras: [],
+  sinEntender: [],
+  aprendido: { comercios: {} },
   ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 } }
 });
 
@@ -20,6 +22,8 @@ export function migrar(estado) {
   e.deudas = Array.isArray(e.deudas) ? e.deudas : [];
   e.pagos = Array.isArray(e.pagos) ? e.pagos : [];
   e.compras = Array.isArray(e.compras) ? e.compras : [];
+  e.sinEntender = Array.isArray(e.sinEntender) ? e.sinEntender : [];
+  e.aprendido = { comercios: {}, ...(e.aprendido || {}) };
   e.ajustes = { ...base.ajustes, ...(estado.ajustes || {}) };
   e.ajustes.recordatorio = { ...base.ajustes.recordatorio, ...(e.ajustes.recordatorio || {}) };
   e.deudas.forEach((d) => { if (!Array.isArray(d.historial)) d.historial = []; });
