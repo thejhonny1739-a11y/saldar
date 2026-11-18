@@ -52,6 +52,8 @@ export function inicio(ctx, c) {
       <div class="card mini"><div class="etiqueta menta">Pagado este mes</div><div class="cifra">${pesos(pagado)}</div></div>
       <div class="card mini"><div class="etiqueta rosa">Por pagar</div><div class="cifra">${pesos(porPagar)}</div></div>
     </div>
+    ${(() => { const u = e.ajustes.ultimoRespaldo; return e.deudas.length && (!u || Date.now() - u > 7 * 86400000)
+      ? '<button class="alerta info" id="resp">Haz un respaldo de tus deudas: toca aquí.</button>' : ''; })()}
     ${vencidas ? `<div class="alerta">Tienes ${plural(vencidas, 'pago vencido', 'pagos vencidos')}.</div>` : ''}
     ${e.deudas.length === 0
       ? `<div class="card vacio"><b>Todavía no registras deudas</b>Agrega la primera para ver tus próximos pagos y alertas.<br><button class="btn" id="primera" style="max-width:none">Agregar deuda</button></div>`
@@ -64,6 +66,8 @@ export function inicio(ctx, c) {
                  <div class="deuda-top"><span class="deuda-nombre">${esc(f.d.nombre)}</span><span class="deuda-monto">${pesos(f.s.pendiente || f.d.cuota)}</span></div>
                  <div class="deuda-pie ${t.clase}">${t.texto}</div></button>`;
              }).join('')}`}`;
+  const resp = c.querySelector('#resp');
+  if (resp) resp.onclick = () => ctx.ir('ajustes', null);
   const primera = c.querySelector('#primera');
   if (primera) primera.onclick = () => ctx.ir('deudas', { vista: 'form' });
   c.querySelectorAll('.deuda[data-id]').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'detalle', id: b.dataset.id }); });

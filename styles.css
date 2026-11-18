@@ -168,3 +168,6 @@ nav button.activo { color: var(--menta); }
 .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; z-index: 20; }
 .modal-card { width: 100%; background: var(--bg); border-top: 1px solid var(--borde); border-radius: 20px 20px 0 0; padding: 20px 18px calc(var(--safe-bottom) + 18px); max-height: 90%; overflow-y: auto; }
 .modal-card h2 { margin: 0 0 16px; }
+
+.alerta.info { display: block; width: 100%; text-align: left; background: rgba(139, 92, 246, .12); border-color: var(--morado); color: #c3b0ff; }
+.nota { color: var(--suave); font-size: 13px; line-height: 1.45; margin: 12px 0 2px; }

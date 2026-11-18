@@ -1,9 +1,10 @@
 // Saldar - Paso 1: base de la app, perfiles con PIN, almacenamiento cifrado y estructura.
 import * as store from './store.js';
-import { esc, pesos } from './util.js';
+import { esc, fechaLarga } from './util.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
+const VERSION_APP = '0.3';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -44,11 +45,13 @@ async function pantallaPerfiles() {
           <span class="avatar">+</span><span class="nombre">Nuevo perfil</span>
         </button>
       </div>
+      <button class="volver" id="restaurar">Restaurar desde un respaldo</button>
     </div>`;
   app.querySelectorAll('.perfil[data-id]').forEach((b) => {
     b.onclick = () => pedirPin(perfiles.find((p) => p.id === b.dataset.id));
   });
   document.getElementById('nuevo').onclick = nuevoPerfil;
+  document.getElementById('restaurar').onclick = elegirRespaldo;
 }
 
 // Teclado numérico propio: no abre el teclado del iPhone y oculta lo que se escribe.
@@ -125,9 +128,10 @@ async function nuevoPerfil() {
         <input id="nombre" type="text" placeholder="Tu nombre" maxlength="24" autocomplete="off" autocapitalize="words" required>
         <button class="btn" type="submit">Continuar</button>
       </form>
-      ${hayPerfiles ? '<button class="volver" id="volver">Cancelar</button>' : ''}
+      ${hayPerfiles ? '<button class="volver" id="volver">Cancelar</button>' : '<button class="volver" id="restaurar">Ya tengo un respaldo</button>'}
     </div>`;
   if (hayPerfiles) document.getElementById('volver').onclick = pantallaPerfiles;
+  else document.getElementById('restaurar').onclick = elegirRespaldo;
   document.getElementById('form').onsubmit = (e) => {
     e.preventDefault();
     const nombre = document.getElementById('nombre').value.trim();
@@ -223,20 +227,97 @@ const VISTAS = {
   calendario: () => proximamente('Calendario', 'Los vencimientos del mes y tus recordatorios.', 'Paso 3'),
   compras: () => proximamente('Compras', 'Pagos con tarjeta capturados por Apple Pay o por el SMS del banco.', 'Paso 4'),
   ajustes() {
+    const ult = sesion.estado.ajustes.ultimoRespaldo;
     return `
       <h1>Ajustes</h1>
       <div class="card">
         <div class="ajuste"><span>Perfil</span><b>${esc(sesion.nombre)}</b></div>
         <div class="ajuste"><span>Moneda</span><b>${esc(sesion.estado.ajustes.moneda)}</b></div>
-        <div class="ajuste"><span>Versión</span><b>Saldar 0.2</b></div>
+        <div class="ajuste"><span>Versión</span><b>Saldar ${VERSION_APP}</b></div>
       </div>
+      <div class="seccion">Tus datos</div>
+      <div class="card">
+        <div class="ajuste"><span>Último respaldo</span><b>${ult ? esc(fechaLarga(ult)) : 'Nunca'}</b></div>
+        <div class="ajuste"><span>Almacenamiento protegido</span><b id="persist">…</b></div>
+        <p class="nota">Tus deudas viven solo en este teléfono. Si borras la app o cambias de teléfono, se pierden. Guarda un respaldo en Archivos o iCloud: va cifrado con tu PIN y nadie lo puede leer sin él.</p>
+      </div>
+      <button class="btn" id="respaldar" style="max-width:none;margin-top:0">Exportar respaldo</button>
+      <button class="btn sec" id="restaurar" style="max-width:none">Restaurar desde un archivo</button>
+      <div class="seccion">Aplicación</div>
+      <button class="btn sec" id="actualizar" style="max-width:none;margin-top:0">Buscar actualización</button>
       <button class="btn" id="bloquear" style="max-width:none">Bloquear ahora</button>
       <button class="btn sec" id="cambiar" style="max-width:none">Cambiar de perfil</button>
       <button class="btn peligro" id="eliminar" style="max-width:none">Eliminar este perfil</button>`;
   }
 };
 
+async function exportarRespaldo() {
+  try {
+    const datos = await store.exportarPerfil(sesion.id);
+    const nombreArchivo = `Saldar-respaldo-${sesion.nombre.replace(/[^\w-]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.json`;
+    const archivo = new File([JSON.stringify(datos)], nombreArchivo, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+      try {
+        await navigator.share({ files: [archivo], title: 'Respaldo de Saldar' });
+      } catch (e) {
+        if (e.name === 'AbortError') return aviso('Respaldo cancelado');
+        throw e;
+      }
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(archivo);
+      a.download = nombreArchivo;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+    sesion.estado.ajustes.ultimoRespaldo = Date.now();
+    await ctx.guardar();
+    aviso('Respaldo exportado');
+    pantallaPrincipal();
+  } catch {
+    aviso('No se pudo crear el respaldo');
+  }
+}
+
+function elegirRespaldo() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    const f = inp.files[0];
+    if (!f) return;
+    try {
+      const obj = JSON.parse(await f.text());
+      let r = await store.importarPerfil(obj, false);
+      if (r.pendiente) {
+        if (!confirm(`Ya existe el perfil "${r.nombre}" en este teléfono. ¿Reemplazarlo con el respaldo? Se perderán los cambios hechos después de ese respaldo.`)) return;
+        r = await store.importarPerfil(obj, true);
+      }
+      aviso(`Perfil "${r.nombre}" restaurado. Entra con tu PIN.`);
+      pantallaPerfiles();
+    } catch (e) {
+      aviso(e instanceof SyntaxError ? 'El archivo no es un respaldo de Saldar.' : (e.message || 'No se pudo leer el archivo.'));
+    }
+  };
+  inp.click();
+}
+
+// Descarga la versión más nueva sin tocar los datos (solo borra la caché de archivos).
+async function buscarActualizacion() {
+  aviso('Buscando actualización…');
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.update().catch(() => {})));
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch { /* sin internet: se recarga con lo que haya */ }
+  location.reload();
+}
+
 function enlazarAjustes() {
+  navigator.storage?.persisted?.().then((p) => { const el = document.getElementById('persist'); if (el) el.textContent = p ? 'Sí' : 'No'; });
+  document.getElementById('respaldar').onclick = exportarRespaldo;
+  document.getElementById('restaurar').onclick = elegirRespaldo;
+  document.getElementById('actualizar').onclick = buscarActualizacion;
   document.getElementById('bloquear').onclick = bloquear;
   document.getElementById('cambiar').onclick = bloquear;
   document.getElementById('eliminar').onclick = async () => {

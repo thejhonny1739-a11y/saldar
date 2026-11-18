@@ -9,8 +9,21 @@ export const estadoInicial = () => ({
   deudas: [],
   pagos: [],
   compras: [],
-  ajustes: { moneda: 'COP' }
+  ajustes: { moneda: 'COP', ultimoRespaldo: null }
 });
+
+// Completa campos que falten en datos guardados por versiones anteriores.
+// Nunca borra nada: solo agrega lo nuevo. Así actualizar la app no pierde información.
+export function migrar(estado) {
+  const base = estadoInicial();
+  const e = { ...base, ...estado };
+  e.deudas = Array.isArray(e.deudas) ? e.deudas : [];
+  e.pagos = Array.isArray(e.pagos) ? e.pagos : [];
+  e.compras = Array.isArray(e.compras) ? e.compras : [];
+  e.ajustes = { ...base.ajustes, ...(estado.ajustes || {}) };
+  e.deudas.forEach((d) => { if (!Array.isArray(d.historial)) d.historial = []; });
+  return e;
+}
 
 function abrirDB() {
   return new Promise((ok, fallo) => {
@@ -63,7 +76,7 @@ export async function desbloquear(id, pin) {
   const p = await leerPerfil(id);
   if (!p) throw new Error('Perfil no encontrado');
   const llave = await derivarLlave(pin, p.sal);
-  const estado = await descifrar(llave, { iv: p.iv, ct: p.ct });
+  const estado = migrar(await descifrar(llave, { iv: p.iv, ct: p.ct }));
   return { id: p.id, nombre: p.nombre, llave, estado };
 }
 
@@ -81,4 +94,39 @@ export async function eliminarPerfil(id) {
 // Pide al navegador que no borre los datos si hay poco espacio.
 export async function pedirPersistencia() {
   try { return await navigator.storage?.persist?.(); } catch { return false; }
+}
+
+/* ================= Respaldo ================= */
+// El respaldo es el bloque YA CIFRADO con el PIN del perfil: quien tenga el archivo no puede leerlo sin el PIN.
+
+const aB64 = (u8) => {
+  let bin = '';
+  for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  return btoa(bin);
+};
+const deB64 = (txt) => Uint8Array.from(atob(txt), (c) => c.charCodeAt(0));
+
+export async function exportarPerfil(id) {
+  const p = await leerPerfil(id);
+  if (!p) throw new Error('Perfil no encontrado');
+  return {
+    formato: 'saldar-respaldo',
+    version: 1,
+    exportado: Date.now(),
+    perfil: { id: p.id, nombre: p.nombre, creado: p.creado, sal: aB64(p.sal), iv: aB64(new Uint8Array(p.iv)), ct: aB64(new Uint8Array(p.ct)) }
+  };
+}
+
+// Valida el archivo y lo guarda. Devuelve { id, nombre, existia }.
+export async function importarPerfil(obj, reemplazar = false) {
+  const pr = obj && obj.formato === 'saldar-respaldo' && obj.perfil;
+  if (!pr || !pr.id || !pr.nombre || !pr.sal || !pr.iv || !pr.ct) throw new Error('Este archivo no es un respaldo de Saldar.');
+  const sal = deB64(pr.sal);
+  const iv = deB64(pr.iv);
+  const ct = deB64(pr.ct);
+  if (sal.length !== 16 || iv.length !== 12 || ct.length < 17) throw new Error('El respaldo está dañado.');
+  const existe = await leerPerfil(pr.id);
+  if (existe && !reemplazar) return { id: pr.id, nombre: pr.nombre, existia: true, pendiente: true };
+  await tx('readwrite', (st) => st.put({ id: pr.id, nombre: pr.nombre, creado: pr.creado || Date.now(), sal, iv, ct }));
+  return { id: pr.id, nombre: pr.nombre, existia: !!existe };
 }
