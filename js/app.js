@@ -1,12 +1,12 @@
 // Saldar - Paso 1: base de la app, perfiles con PIN, almacenamiento cifrado y estructura.
 import * as store from './store.js';
-import { esc, fechaLarga, compartirArchivo } from './util.js';
+import { esc, fechaLarga, entregarICS } from './util.js';
 import * as calendarioUI from './calendario-ui.js';
 import { respaldoICS } from './ics.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.4.1';
+const VERSION_APP = '0.4.2';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -322,7 +322,7 @@ function enlazarAjustes() {
   document.getElementById('respaldar').onclick = exportarRespaldo;
   document.getElementById('restaurar').onclick = elegirRespaldo;
   document.getElementById('recordar').onclick = async () => {
-    const r = await compartirArchivo('Saldar-recordatorio-respaldo.ics', respaldoICS(), 'text/calendar', 'Recordatorio de respaldo');
+    const r = await entregarICS('Saldar-recordatorio-respaldo.ics', respaldoICS(), 'Recordatorio de respaldo');
     aviso(r === 'cancelado' ? 'Cancelado' : 'Recordatorio listo para el Calendario');
   };
   document.getElementById('actualizar').onclick = buscarActualizacion;

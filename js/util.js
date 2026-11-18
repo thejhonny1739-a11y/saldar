@@ -57,3 +57,24 @@ export async function compartirArchivo(nombre, contenido, tipo, titulo) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   return 'descargado';
 }
+
+// Explica cómo agregar un .ics al Calendario (iOS no ofrece "Calendario" en la hoja de compartir) y luego lo entrega.
+export function entregarICS(nombre, contenido, titulo) {
+  return new Promise((resolver) => {
+    const m = modal(`
+      <h2>Agregar al Calendario</h2>
+      <ol class="pasos">
+        <li>En la hoja que se abre, toca <b>Guardar en Archivos</b> y elige una carpeta.</li>
+        <li>Abre la app <b>Archivos</b> y toca el archivo que guardaste.</li>
+        <li>Abajo toca <b>Agregar todo</b> y elige un calendario.</li>
+      </ol>
+      <p class="nota">También sirve <b>Mail</b>: envíatelo a ti mismo y toca el adjunto.</p>
+      <button class="btn" id="seguir" style="max-width:none">Continuar</button>
+      <button class="volver" id="no" type="button" style="width:100%">Cancelar</button>`);
+    m.el.querySelector('#no').onclick = () => { m.cerrar(); resolver('cancelado'); };
+    m.el.querySelector('#seguir').onclick = async () => {
+      m.cerrar();
+      resolver(await compartirArchivo(nombre, contenido, 'text/calendar', titulo));
+    };
+  });
+}

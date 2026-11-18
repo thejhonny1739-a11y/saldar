@@ -1,5 +1,5 @@
 // Pantalla Calendario: cuadrícula del mes con los pagos programados y recordatorios para el iPhone.
-import { esc, pesos, fechaCorta, compartirArchivo } from './util.js';
+import { esc, pesos, fechaCorta, entregarICS } from './util.js';
 import * as C from './calculos.js';
 import { pagosICS } from './ics.js';
 
@@ -99,7 +99,7 @@ export function calendario(ctx, c) {
   c.querySelector('#agregar').onclick = async () => {
     const r = pagosICS(e, e.ajustes.recordatorio, new Date());
     if (r.cantidad === 0) return ctx.aviso('No hay pagos pendientes. Agrega cuota y día de pago a tus deudas.');
-    const res = await compartirArchivo('Saldar-pagos.ics', r.texto, 'text/calendar', 'Pagos de Saldar');
+    const res = await entregarICS('Saldar-pagos.ics', r.texto, 'Pagos de Saldar');
     ctx.aviso(res === 'cancelado' ? 'Cancelado' : `${r.cantidad} pagos listos para el Calendario`);
   };
 }

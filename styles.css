@@ -197,3 +197,6 @@ nav button.activo { color: var(--menta); }
 /* Pantallas anchas (iPad, escritorio): columna centrada como en el teléfono */
 .contenido, nav { width: 100%; max-width: 560px; align-self: center; }
 .acceso { max-width: 560px; width: 100%; align-self: center; }
+
+.pasos { margin: 0 0 12px; padding-left: 22px; line-height: 1.5; }
+.pasos li { margin-bottom: 8px; }
