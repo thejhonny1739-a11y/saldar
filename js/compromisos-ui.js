@@ -140,6 +140,9 @@ export function hoy(ctx, c) {
   const respaldoViejo = e.deudas.length + e.compromisos.length > 0 && (!e.ajustes.ultimoRespaldo || Date.now() - e.ajustes.ultimoRespaldo > 7 * 86400000);
   const totalDeuda = e.deudas.reduce((t, d) => t + (d.saldo || 0), 0);
   const cdtAvisos = Q.cdtPorVencer(e, 15, ahora);
+  const py = Q.gastables(e).length ? Q.proyeccionMes(e, ahora) : null;
+  const proy = py && py.pendientes
+    ? `<div class="proy-card"><span class="etiqueta">Te quedan este mes</span><b class="${py.quedan < 0 ? 'rosa' : 'menta'}">${pesos(py.quedan)}</b><span class="proy-sub">después de cobrar y pagar lo que falta (${py.pendientes} ${py.pendientes === 1 ? 'movimiento' : 'movimientos'}).</span>${py.corto ? `<span class="proy-alerta">Te quedarías corto el ${esc(fechaCorta(py.corto.fecha < new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()) ? ahora : py.corto.fecha))} al pagar “${esc(py.corto.c.nombre)}”.</span>` : ''}</div>` : '';
   const pat = Q.patrimonio(e);
   const dinero = (e.cuentas || []).length
     ? `<button class="dinero-card" id="dinero"><span class="dinero-col"><span class="etiqueta">Tienes disponible</span><b>${pesos(Q.disponible(e))}</b></span><span class="dinero-col"><span class="etiqueta">Patrimonio neto</span><b class="${pat < 0 ? 'rosa' : ''}">${pesos(pat)}</b></span><span class="flecha-txt">›</span></button>`
@@ -160,6 +163,7 @@ export function hoy(ctx, c) {
       <div><span class="etiqueta">${der[0]}</span><b class="${der[2]}">${pesos(der[1])}</b></div>
     </div>
     ${dinero}
+    ${proy}
     ${cdtAvisos.map((x) => { const dd = Q.diasParaVencer(x, ahora); return `<div class="alerta">Tu CDT “${esc(x.nombre)}” ${dd < 0 ? 'ya venció' : dd === 0 ? 'vence hoy' : `vence en ${dd} ${dd === 1 ? 'día' : 'días'}`}.</div>`; }).join('')}
     ${vencidas ? `<div class="alerta">Tienes ${vencidas} ${vencidas === 1 ? 'pago de deuda vencido' : 'pagos de deudas vencidos'}.</div>` : ''}
     ${respaldoViejo ? `<button class="alerta info" id="resp">${e.ajustes.ultimoRespaldo ? `Hace ${Math.floor((Date.now() - e.ajustes.ultimoRespaldo) / 86400000)} días que no haces un respaldo.` : 'Aún no has hecho un respaldo.'} Toca aquí para guardarlo ahora.</button>` : ''}

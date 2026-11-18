@@ -71,3 +71,65 @@ export function diasParaVencer(c, hoy = new Date()) {
 // CDT por vencer (o vencidos) en los próximos `dias` días.
 export const cdtPorVencer = (e, dias = 15, hoy = new Date()) =>
   (e.cuentas || []).filter((c) => c.tipo === 'cdt' && c.vence && diasParaVencer(c, hoy) <= dias);
+
+/* ---------- Compras ---------- */
+
+// Cuenta de la que sale una compra. 'auto': la cuenta cuya tarjeta débito coincide, o la principal.
+// Las compras con una tarjeta de crédito (de una deuda) no mueven tus cuentas: suben esa deuda.
+export function cuentaDeCompra(e, compra) {
+  if (compra.aplicado) return null;
+  const id = compra.cuentaId;
+  if (id === '') return null;
+  let cu;
+  if (id === undefined || id === null || id === 'auto') {
+    if (compra.tarjeta && (e.deudas || []).some((d) => d.tarjeta === compra.tarjeta)) return null;
+    cu = gastables(e).find((c) => c.tarjeta && c.tarjeta === compra.tarjeta) || principal(e);
+  } else {
+    cu = gastables(e).find((c) => c.id === id) || null;
+  }
+  return cuentaAplica(cu, compra.fecha) ? cu : null;
+}
+
+export function aplicarCompra(e, compra) {
+  if (compra.descontado) return;
+  const cu = cuentaDeCompra(e, compra);
+  if (!cu || !(compra.monto > 0)) return;
+  cu.saldo -= compra.monto;
+  compra.descontadoDe = cu.id;
+  compra.descontado = compra.monto;
+}
+
+export function revertirCompra(e, compra) {
+  if (!compra.descontado) return;
+  const cu = (e.cuentas || []).find((c) => c.id === compra.descontadoDe);
+  if (cu) cu.saldo += compra.descontado;
+  compra.descontado = 0;
+  delete compra.descontadoDe;
+}
+
+export function sincronizarCompra(e, compra) {
+  revertirCompra(e, compra);
+  aplicarCompra(e, compra);
+}
+
+/* ---------- Proyección del mes ---------- */
+import { ocurrenciasRango } from './compromisos.js';
+
+// Con lo que hay en tus cuentas y lo que falta por cobrar y pagar este mes: cuánto te queda y
+// el primer pago con el que te quedarías corto (o null).
+export function proyeccionMes(e, hoy = new Date()) {
+  const h = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const ini = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+  const pend = ocurrenciasRango(e, null, ini, fin, hoy)
+    .filter((o) => !o.pagado && (o.c.esDeuda || resolver(e, o.c.cuentaId)))
+    .map((o) => ({ o, f: o.fecha < h ? h : o.fecha }))
+    .sort((a, b) => a.f - b.f || (a.o.tipo === 'ingreso' ? -1 : 1) - (b.o.tipo === 'ingreso' ? -1 : 1));
+  let saldo = disponible(e);
+  let corto = null;
+  for (const { o } of pend) {
+    saldo += o.tipo === 'ingreso' ? o.monto : -o.monto;
+    if (saldo < 0 && !corto) corto = o;
+  }
+  return { quedan: saldo, corto, pendientes: pend.length };
+}

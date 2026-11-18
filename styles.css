@@ -375,3 +375,8 @@ nav button[data-tab] { min-width: 0; }
 .cuenta-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 0; text-align: left; border-bottom: 1px solid var(--borde); }
 .cuenta-saldo { flex: none; font-weight: 700; font-size: clamp(14px, 4.4vw, 17px); white-space: nowrap; }
 .cifra.neg { color: var(--rosa); }
+.proy-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; margin: -4px 0 12px; background: var(--card); border: 1px solid var(--borde); border-radius: var(--radio); }
+.proy-card b { font-size: clamp(18px, 6vw, 24px); }
+.proy-card b.menta { color: var(--menta); } .proy-card b.rosa { color: var(--rosa); }
+.proy-sub { color: var(--suave); font-size: 12px; }
+.proy-alerta { color: #ff8fb4; font-size: 13px; margin-top: 2px; }

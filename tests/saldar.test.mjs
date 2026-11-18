@@ -175,3 +175,50 @@ test('cuentas: CDT por vencer', () => {
   assert.equal(Q.cdtPorVencer(e, 15, new Date(2026, 10, 20)).length, 1);
   assert.equal(Q.cdtPorVencer(e, 5, new Date(2026, 10, 20)).length, 0);
 });
+
+test('cuentas: una compra descuenta de la principal, se ajusta al editar y se devuelve al borrar', () => {
+  const { e, c } = conCuenta();
+  const compra = { id: 'p', monto: 100, fecha: '2026-11-20', tarjeta: '', creada: 1 };
+  Q.aplicarCompra(e, compra);
+  assert.equal(c.saldo, 900);
+  compra.monto = 250; Q.sincronizarCompra(e, compra);
+  assert.equal(c.saldo, 750);
+  Q.revertirCompra(e, compra);
+  assert.equal(c.saldo, 1000);
+});
+test('cuentas: compra con tarjeta de crédito no descuenta; con débito va a su cuenta', () => {
+  const { e, c } = conCuenta();
+  e.deudas.push({ id: 'd', nombre: 'Visa', saldo: 0, tarjeta: '4821', historial: [] });
+  const deb = { id: 'k9', nombre: 'Nu', tipo: 'cuenta', saldo: 500, tarjeta: '7777', desde: '2026-11-01' };
+  e.cuentas.push(deb);
+  const credito = { id: 'a', monto: 100, fecha: '2026-11-20', tarjeta: '4821' };
+  Q.aplicarCompra(e, credito);
+  assert.equal(c.saldo, 1000);
+  const debito = { id: 'b', monto: 100, fecha: '2026-11-20', tarjeta: '7777' };
+  Q.aplicarCompra(e, debito);
+  assert.equal(deb.saldo, 400);
+  assert.equal(c.saldo, 1000);
+  const eleg = { id: 'c', monto: 10, fecha: '2026-11-20', cuentaId: 'k1' };
+  Q.aplicarCompra(e, eleg);
+  assert.equal(c.saldo, 990);
+});
+test('cuentas: una compra anterior al saldo inicial no descuenta', () => {
+  const { e, c } = conCuenta('2026-11-10');
+  Q.aplicarCompra(e, { id: 'v', monto: 100, fecha: '2026-11-05' });
+  assert.equal(c.saldo, 1000);
+});
+test('proyección del mes: cuánto te queda y dónde te quedas corto', () => {
+  const { e } = conCuenta();
+  e.compromisos.push({ id: 'g', nombre: 'Arriendo', tipo: 'gasto', monto: 1200, frecuencia: 'unico', inicio: '2026-11-25', espacioId: 'personal', cumplidos: {} });
+  e.compromisos.push({ id: 'i', nombre: 'Salario', tipo: 'ingreso', monto: 2000, frecuencia: 'unico', inicio: '2026-11-28', espacioId: 'personal', cumplidos: {} });
+  const p = Q.proyeccionMes(e, new Date(2026, 10, 18));
+  assert.equal(p.quedan, 1000 - 1200 + 2000);
+  assert.equal(p.corto.c.nombre, 'Arriendo'); // antes de cobrar el salario, no alcanza
+  e.compromisos[0].monto = 500;
+  assert.equal(Q.proyeccionMes(e, new Date(2026, 10, 18)).corto, null);
+});
+test('proyección: lo que está en "No mover dinero" no cuenta', () => {
+  const { e } = conCuenta();
+  e.compromisos.push({ id: 'g', nombre: 'Otro', tipo: 'gasto', monto: 5000, frecuencia: 'unico', inicio: '2026-11-25', espacioId: 'personal', cumplidos: {}, cuentaId: '' });
+  assert.equal(Q.proyeccionMes(e, new Date(2026, 10, 18)).quedan, 1000);
+});

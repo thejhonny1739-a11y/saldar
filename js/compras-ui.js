@@ -5,6 +5,8 @@ import { aISO, parseMonto } from './calculos.js';
 import { analizar } from './capturas.js';
 import * as G from './graficas.js';
 import * as V from './vinculos.js';
+import * as Q from './cuentas.js';
+import { opcionesCuenta } from './cuentas-ui.js';
 
 const categoriaDe = (e, id) => (e.categorias || []).find((k) => k.id === id) || { id: 'otros', nombre: 'Otros', icono: '📦', color: '#9aa5b1' };
 
@@ -147,6 +149,8 @@ export function formulario(ctx, c, id) {
         <label>Tarjeta (4 dígitos)<input name="tarjeta" inputmode="numeric" maxlength="4" value="${esc(v.tarjeta)}" placeholder="Opcional" autocomplete="off"></label>
       </div>
       <p class="nota" id="vinc" style="margin:-4px 0 14px"></p>
+      ${Q.gastables(e).length ? `<label>Pagar desde<select name="cuentaId">${opcionesCuenta(e, b.cuentaId)}</select></label>
+      <p class="nota" style="margin:-6px 0 14px">Si la tarjeta es la débito de una de tus cuentas, se descuenta de esa. Con tarjeta de crédito no se descuenta: sube la deuda.</p>` : ''}
       <label>Categoría<select name="categoria">${e.categorias.filter((k) => k.tipo === 'gasto').map((k) => `<option value="${esc(k.id)}"${k.id === v.categoria ? ' selected' : ''}>${esc(k.icono)} ${esc(k.nombre)}</option>`).join('')}</select></label>
       <label>Nota (opcional)<input name="nota" maxlength="80" value="${esc(v.nota)}" autocomplete="off"></label>
       <div class="error" id="err"></div>
@@ -173,7 +177,8 @@ export function formulario(ctx, c, id) {
     let vinculada = '';
     const nueva = {
       comercio: f.comercio.value.trim(), monto: parseMonto(f.monto.value), fecha: f.fecha.value || hoy,
-      tarjeta: f.tarjeta.value.replace(/\D/g, '').slice(0, 4), categoria: f.categoria.value, nota: f.nota.value.trim()
+      tarjeta: f.tarjeta.value.replace(/\D/g, '').slice(0, 4), categoria: f.categoria.value, nota: f.nota.value.trim(),
+      cuentaId: f.cuentaId ? f.cuentaId.value : (x ? x.cuentaId : 'auto')
     };
     if (!nueva.comercio) { err.textContent = 'Escribe el comercio.'; return; }
     if (nueva.monto <= 0) { err.textContent = 'El monto debe ser mayor a cero.'; return; }
@@ -184,9 +189,11 @@ export function formulario(ctx, c, id) {
       e.compras.push(nueva2);
       const dv = V.aplicar(e, nueva2);
       if (dv) vinculada = dv.nombre;
+      Q.aplicarCompra(e, nueva2);
     } else {
       Object.assign(x, nueva, { revisar: false });
       V.sincronizar(e, x);
+      Q.sincronizarCompra(e, x);
     }
     e.aprendido.comercios[L.normalizar(nueva.comercio)] = nueva.categoria;
     await ctx.guardar();
@@ -201,13 +208,17 @@ export function formulario(ctx, c, id) {
     const copia = { ...x };
     const estabaSumada = !!x.aplicado;
     V.revertir(e, x);
+    Q.revertirCompra(e, x);
     e.compras = e.compras.filter((k) => k.id !== x.id);
     await ctx.guardar();
     ctx.aviso('Compra eliminada', async () => {
       copia.aplicado = 0;
       delete copia.deudaId;
+      copia.descontado = 0;
+      delete copia.descontadoDe;
       e.compras.push(copia);
       if (estabaSumada) V.aplicar(e, copia, true);
+      Q.aplicarCompra(e, copia);
       await ctx.guardar();
       ctx.ir('compras', null);
     });
@@ -261,6 +272,7 @@ function modalResumen(ctx, r) {
       const k = { id: crypto.randomUUID(), ...c, nota: '', creada: ahora + i };
       e.compras.push(k);
       if (V.aplicar(e, k)) vinculadas++;
+      Q.aplicarCompra(e, k);
     });
     r.ilegibles.forEach((t) => { e.sinEntender = [{ id: crypto.randomUUID(), f: ahora, texto: t.slice(0, 600) }, ...(e.sinEntender || [])].slice(0, 30); });
     e.capturasVistas = [...(e.capturasVistas || []), ...r.hashes].slice(-3000);
