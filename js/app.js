@@ -1,5 +1,7 @@
 // Saldar - Paso 1: base de la app, perfiles con PIN, almacenamiento cifrado y estructura.
 import * as store from './store.js';
+import { esc, pesos } from './util.js';
+import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
 const LARGO_PIN = 6;
@@ -7,10 +9,9 @@ const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en 
 
 let sesion = null;        // { id, nombre, llave, estado } mientras el perfil está abierto
 let pestana = 'inicio';
+let sub = null;           // pantalla interna: { vista: 'detalle' | 'form', id }
 let ocultoDesde = 0;
 
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pesos = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
 const inicial = (nombre) => esc((nombre.trim()[0] || '?').toUpperCase());
 
 function aviso(texto) {
@@ -107,6 +108,7 @@ function pedirPin(perfil) {
         return { error: 'PIN incorrecto' };
       }
       pestana = 'inicio';
+      sub = null;
       pantallaPrincipal();
     }
   });
@@ -155,6 +157,7 @@ function confirmarPin(nombre, pin1) {
       sesion = r.sesion;
       store.pedirPersistencia();
       pestana = 'inicio';
+      sub = null;
       pantallaPrincipal();
     }
   });
@@ -171,7 +174,25 @@ const ICONOS = {
 };
 const TITULOS = { inicio: 'Inicio', deudas: 'Deudas', calendario: 'Calendario', compras: 'Compras', ajustes: 'Ajustes' };
 
+const ctx = {
+  sesion: () => sesion,
+  guardar: async () => {
+    try { await store.guardar(sesion); } catch { aviso('No se pudo guardar. Intenta de nuevo.'); throw new Error('guardar'); }
+  },
+  ir(tab, subvista) { pestana = tab; sub = subvista || null; pantallaPrincipal(); },
+  aviso
+};
+
 function pantallaPrincipal() {
+  // Pantallas internas (detalle y formulario de deuda): sin barra inferior.
+  if (sub) {
+    app.innerHTML = '<div class="contenido" id="contenido"></div>';
+    const cont = document.getElementById('contenido');
+    if (sub.vista === 'detalle') deudasUI.detalle(ctx, cont, sub.id);
+    else deudasUI.formulario(ctx, cont, sub.id);
+    cont.scrollTop = 0;
+    return;
+  }
   app.innerHTML = `
     <div class="contenido" id="contenido"></div>
     <nav>
@@ -181,11 +202,15 @@ function pantallaPrincipal() {
         </button>`).join('')}
     </nav>`;
   app.querySelectorAll('nav button').forEach((b) => {
-    b.onclick = () => { pestana = b.dataset.tab; pantallaPrincipal(); };
+    b.onclick = () => ctx.ir(b.dataset.tab, null);
   });
   const c = document.getElementById('contenido');
-  c.innerHTML = VISTAS[pestana]();
-  if (pestana === 'ajustes') enlazarAjustes();
+  if (pestana === 'inicio') deudasUI.inicio(ctx, c);
+  else if (pestana === 'deudas') deudasUI.lista(ctx, c);
+  else {
+    c.innerHTML = VISTAS[pestana]();
+    if (pestana === 'ajustes') enlazarAjustes();
+  }
 }
 
 function proximamente(titulo, texto, paso) {
@@ -195,23 +220,6 @@ function proximamente(titulo, texto, paso) {
 }
 
 const VISTAS = {
-  inicio() {
-    const e = sesion.estado;
-    const total = e.deudas.reduce((s, d) => s + (d.saldo || 0), 0);
-    return `
-      <h1>Hola, ${esc(sesion.nombre)}</h1>
-      <p class="saludo">Tu resumen de deudas</p>
-      <div class="card">
-        <div class="etiqueta">Total adeudado</div>
-        <div class="cifra">${pesos(total)}</div>
-      </div>
-      <div class="fila">
-        <div class="card mini"><div class="etiqueta menta">Pagado este mes</div><div class="cifra">${pesos(0)}</div></div>
-        <div class="card mini"><div class="etiqueta rosa">Por pagar</div><div class="cifra">${pesos(0)}</div></div>
-      </div>
-      <div class="card vacio"><b>Todavía no registras deudas</b>Aquí verás tus próximos pagos y alertas.<br><span class="insignia">Se activa en el paso 2</span></div>`;
-  },
-  deudas: () => proximamente('Deudas', 'Crea y edita tus deudas, montos, tasas y días de pago.', 'Paso 2'),
   calendario: () => proximamente('Calendario', 'Los vencimientos del mes y tus recordatorios.', 'Paso 3'),
   compras: () => proximamente('Compras', 'Pagos con tarjeta capturados por Apple Pay o por el SMS del banco.', 'Paso 4'),
   ajustes() {
@@ -220,7 +228,7 @@ const VISTAS = {
       <div class="card">
         <div class="ajuste"><span>Perfil</span><b>${esc(sesion.nombre)}</b></div>
         <div class="ajuste"><span>Moneda</span><b>${esc(sesion.estado.ajustes.moneda)}</b></div>
-        <div class="ajuste"><span>Versión</span><b>Saldar 0.1</b></div>
+        <div class="ajuste"><span>Versión</span><b>Saldar 0.2</b></div>
       </div>
       <button class="btn" id="bloquear" style="max-width:none">Bloquear ahora</button>
       <button class="btn sec" id="cambiar" style="max-width:none">Cambiar de perfil</button>

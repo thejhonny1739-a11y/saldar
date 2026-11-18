@@ -25,7 +25,8 @@ body {
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 input { font: inherit; color: inherit; user-select: text; -webkit-user-select: text; }
 
-#app { height: 100%; display: flex; flex-direction: column; }
+/* Fijo a toda la pantalla: evita la franja oscura bajo la barra en el iPhone instalado */
+#app { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; background: var(--bg); }
 
 /* ---------- Pantallas de acceso ---------- */
 .acceso {
@@ -127,3 +128,43 @@ nav button.activo { color: var(--menta); }
   background: var(--card-2); border: 1px solid var(--borde); padding: 10px 16px; border-radius: 999px;
   font-size: 14px; max-width: 90%; z-index: 10;
 }
+
+/* ---------- Deudas ---------- */
+:root { --ambar: #ffb020; }
+.encabezado { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.encabezado h1 { margin: 0; }
+.btn-chico { padding: 8px 14px; border-radius: 999px; background: var(--grad); color: #fff; font-weight: 600; font-size: 15px; }
+.atras { color: var(--menta); font-size: 17px; padding: 6px 0; }
+.seccion { margin: 20px 2px 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--suave); }
+.alerta { background: rgba(255, 45, 120, .12); border: 1px solid var(--rosa); color: #ff8fb4; border-radius: var(--radio); padding: 12px 14px; margin-bottom: 14px; }
+
+.deuda { display: block; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--borde); border-radius: var(--radio); padding: 14px 16px; margin-bottom: 10px; }
+.deuda:active { background: var(--card-2); }
+.deuda-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.deuda-nombre { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deuda-monto { font-size: 17px; font-weight: 700; color: #ff8fb4; white-space: nowrap; }
+.deuda-sub { color: var(--suave); font-size: 13px; margin-top: 3px; }
+.deuda-pie { font-size: 13px; margin-top: 8px; color: var(--suave); }
+.deuda-pie.menta, .menta { color: var(--menta); }
+.deuda-pie.rosa { color: var(--rosa); }
+.deuda-pie.ambar { color: var(--ambar); }
+.barra { height: 6px; border-radius: 99px; background: var(--card-2); margin-top: 10px; overflow: hidden; }
+.barra span { display: block; height: 100%; background: linear-gradient(90deg, var(--morado), var(--menta)); border-radius: 99px; }
+
+.hist { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; }
+.hist-f { color: var(--suave); font-size: 13px; white-space: nowrap; }
+.hist-n { color: var(--suave); font-size: 13px; margin-top: 2px; }
+.sep { height: 1px; background: var(--borde); margin: 8px 0; }
+.enlace { color: var(--suave); font-size: 13px; text-decoration: underline; padding: 4px 0; display: block; }
+
+.formulario label, .modal-card label { display: block; margin-bottom: 14px; font-size: 13px; color: var(--suave); }
+.formulario input, .formulario select, .formulario textarea,
+.modal-card input { display: block; width: 100%; margin-top: 6px; padding: 13px 14px; font-size: 17px; color: var(--texto); background: var(--card); border: 1px solid var(--borde); border-radius: 12px; outline: none; font-family: inherit; user-select: text; -webkit-user-select: text; appearance: none; -webkit-appearance: none; }
+.formulario input:focus, .formulario select:focus, .formulario textarea:focus, .modal-card input:focus { border-color: var(--morado); }
+.dos { display: flex; gap: 12px; }
+.dos label { flex: 1; min-width: 0; }
+.error { color: var(--rosa); min-height: 1.2em; margin-bottom: 8px; font-size: 14px; }
+
+.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; z-index: 20; }
+.modal-card { width: 100%; background: var(--bg); border-top: 1px solid var(--borde); border-radius: 20px 20px 0 0; padding: 20px 18px calc(var(--safe-bottom) + 18px); max-height: 90%; overflow-y: auto; }
+.modal-card h2 { margin: 0 0 16px; }
