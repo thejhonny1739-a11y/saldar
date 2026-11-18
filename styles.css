@@ -305,3 +305,43 @@ nav button[data-tab] { min-width: 0; }
 .opcion-add b { display: block; font-size: 17px; font-weight: 600; }
 .opcion-add small { display: block; color: var(--suave); font-size: 13px; margin-top: 2px; }
 .contenido { padding-bottom: 44px; }
+
+/* ---------- Gráficas ---------- */
+.rosa { color: var(--rosa); } .suave { color: var(--suave); }
+.dona-caja { padding: 16px 14px; }
+.dona { position: relative; width: min(200px, 62vw); margin: 0 auto 14px; }
+.dona svg { display: block; width: 100%; height: auto; }
+.dona-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 22%; }
+.dona-centro b { font-size: clamp(12px, 4vw, 17px); margin-top: 3px; line-height: 1.15; word-break: break-word; }
+.leyenda-lista { display: grid; gap: 8px; }
+.ley-fila { display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 0; }
+.ley-fila i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.ley-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ley-pct { color: var(--suave); font-size: 12px; flex: none; }
+.ley-fila b { flex: none; font-size: 13px; }
+
+.tendencia { display: flex; gap: 2px; height: 150px; }
+.tend-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.tend-val { font-size: 9px; height: 14px; white-space: nowrap; letter-spacing: -.3px; }
+.tend-val.menta { color: var(--menta); } .tend-val.rosa { color: var(--rosa); }
+.tend-barras { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.tend-barras i { display: block; width: 36%; max-width: 8px; border-radius: 3px 3px 0 0; min-height: 2px; }
+.b-ing { background: var(--menta); } .b-gas { background: var(--rosa); }
+.tend-mes { font-size: 11px; color: var(--suave); margin-top: 4px; }
+.tend-col.ahora .tend-mes { color: var(--menta); font-weight: 700; }
+
+.matriz { padding: 12px 10px; }
+.mx-cab, .mx-fila { display: flex; align-items: center; gap: 6px; }
+.mx-cab { margin-bottom: 4px; }
+.mx-cab > .etiqueta { flex: none; width: 104px; }
+.mx-meses, .mx-celdas { flex: 1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); text-align: center; font-size: 10px; color: var(--suave); }
+.mx-fila { border-top: 1px solid var(--borde); }
+.mx-nom { flex: none; width: 104px; display: flex; align-items: center; gap: 6px; padding: 6px 0; text-align: left; min-width: 0; }
+.mx-ico { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; flex: none; }
+.mx-txt { min-width: 0; display: flex; flex-direction: column; }
+.mx-txt b { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-txt small { font-size: 10px; color: var(--suave); white-space: nowrap; }
+.celda { height: 32px; display: grid; place-items: center; min-width: 0; }
+.celda i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+.mx-grupo { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 2px 6px; color: var(--morado); }
+.mx-grupo b { font-size: 15px; } .mx-grupo em { font-style: normal; font-size: 12px; color: var(--suave); }

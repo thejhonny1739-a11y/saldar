@@ -2,6 +2,7 @@
 import { esc, pesos, fechaCorta, miles, enlazarMonto, modal } from './util.js';
 import { parseMonto, aISO, situacion } from './calculos.js';
 import * as K from './compromisos.js';
+import * as G from './graficas.js';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MES3 = MESES.map((m) => m.slice(0, 3));
@@ -9,7 +10,8 @@ const MES3 = MESES.map((m) => m.slice(0, 3));
 let periodo = 'mensual'; // 'anual' | 'mensual' | 'semanal'
 let ancla = null;        // fecha de referencia del periodo que se está viendo
 let modo = 'balance';    // 'balance' | 'gastos' | 'ingresos'
-export const reiniciar = () => { ancla = null; periodo = 'mensual'; modo = 'balance'; };
+const cerrados = new Set(); // grupos plegados de la matriz anual
+export const reiniciar = () => { ancla = null; periodo = 'mensual'; modo = 'balance'; cerrados.clear(); };
 
 const ico = (cat, clase = '') => {
   const col = K.colorSeguro(cat.color);
@@ -66,6 +68,19 @@ export function hoy(ctx, c) {
     nav = `<button class="chip-mes act" id="hoy">${esc(t)}</button>`;
   }
 
+  /* Gráficas */
+  const grafDona = () => {
+    if (!todas.length) return '';
+    if (modo === 'balance') return G.dona([{ nombre: 'Ingresos', valor: r.ingresos, color: '#00d4a0' }, { nombre: 'Gastos', valor: r.gastos, color: '#ff2d78' }], 'Balance', pesos(grande));
+    const por = new Map();
+    for (const o of lista) {
+      const cat = K.categoriaDe(e, o.c);
+      const x = por.get(cat.id) || { nombre: cat.nombre, icono: cat.icono, color: cat.color, valor: 0 };
+      x.valor += o.monto; por.set(cat.id, x);
+    }
+    return G.dona([...por.values()], modo === 'gastos' ? 'Gastos' : 'Ingresos', pesos(grande));
+  };
+
   /* Filas */
   const fila = (o) => {
     const cat = K.categoriaDe(e, o.c);
@@ -86,19 +101,12 @@ export function hoy(ctx, c) {
   };
 
   let cuerpo = '';
+  let matrizInfo = null;
   if (periodo === 'anual') {
-    cuerpo = MESES.map((nom, i) => {
-      const del = todas.filter((o) => o.fecha.getMonth() === i);
-      const rm = K.resumenMes(del);
-      const val = modo === 'gastos' ? rm.gastos : modo === 'ingresos' ? rm.ingresos : rm.ingresos - rm.gastos;
-      const esAhora = ancla.getFullYear() === ahora.getFullYear() && i === ahora.getMonth();
-      const total = rm.ingresos + rm.gastos;
-      const pc = total ? Math.round((rm.ingresos / total) * 100) : 0;
-      return `<button class="mes-fila${esAhora ? ' ahora' : ''}" data-mes="${i}">
-        <span class="mes-nom">${nom}<small>${del.length ? `${del.length} ${del.length === 1 ? 'movimiento' : 'movimientos'}` : 'Sin movimientos'}</small></span>
-        <span class="mes-barra"><span style="width:${pc}%"></span></span>
-        <b class="${val < 0 ? 'rosa' : modo === 'balance' || modo === 'ingresos' ? 'menta' : ''}">${del.length ? pesos(val) : '—'}</b></button>`;
-    }).join('');
+    const meses = MESES.map((_, i) => { const rm = K.resumenMes(todas.filter((o) => o.fecha.getMonth() === i)); return { i, ing: rm.ingresos, gas: rm.gastos }; });
+    matrizInfo = G.matriz(e, todas, cerrados);
+    cuerpo = grafDona() + (todas.length ? G.tendencia(meses, ancla.getFullYear() === ahora.getFullYear() ? ahora.getMonth() : -1) : '') + matrizInfo.html
+      + (todas.length ? '' : '<div class="card vacio"><b>Nada por aquí</b>No hay movimientos en este año.</div>');
   } else if (lista.length === 0) {
     cuerpo = `<div class="card vacio"><b>Nada por aquí</b>${(e.compromisos || []).length || e.deudas.length ? 'No hay movimientos en este periodo.' : 'Toca el botón + para crear tu primer compromiso: la luz, el arriendo, tu salario… Se repite solo.'}</div>`;
   } else if (periodo === 'semanal') {
@@ -112,6 +120,7 @@ export function hoy(ctx, c) {
       cuerpo += fila(o);
     }
   } else {
+    cuerpo = grafDona();
     let sem = 0;
     for (const o of lista) {
       const n = K.semanaDelMes(o.fecha);
@@ -154,7 +163,12 @@ export function hoy(ctx, c) {
   c.querySelector('#hoy').onclick = () => nuevaAncla(new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
   c.querySelectorAll('.periodos button').forEach((b) => { b.onclick = () => { periodo = b.dataset.p; hoy(ctx, c); }; });
   c.querySelectorAll('.modos button').forEach((b) => { b.onclick = () => { modo = b.dataset.modo; hoy(ctx, c); }; });
-  c.querySelectorAll('.mes-fila').forEach((b) => { b.onclick = () => { periodo = 'mensual'; ancla = new Date(ancla.getFullYear(), Number(b.dataset.mes), 1); hoy(ctx, c); }; });
+  c.querySelectorAll('.tend-col').forEach((b) => { b.onclick = () => { periodo = 'mensual'; ancla = new Date(ancla.getFullYear(), Number(b.dataset.mes), 1); hoy(ctx, c); }; });
+  c.querySelectorAll('.mx-grupo').forEach((b) => { b.onclick = () => { const g = b.dataset.grupo; if (cerrados.has(g)) cerrados.delete(g); else cerrados.add(g); hoy(ctx, c); }; });
+  c.querySelectorAll('.mx-nom').forEach((b) => { b.onclick = () => (b.dataset.deuda ? ctx.ir('deudas', { vista: 'detalle', id: b.dataset.edit }) : ctx.ir('inicio', { vista: 'compromiso', id: b.dataset.edit })); });
+  c.querySelectorAll('.celda[data-fila]').forEach((b) => {
+    b.onclick = () => modalCelda(ctx, matrizInfo.filas.get(b.dataset.fila), Number(b.dataset.m), () => hoy(ctx, c));
+  });
   c.querySelector('#espacio').onclick = () => modalEspacios(ctx, () => hoy(ctx, c));
   c.querySelector('#perfil').onclick = () => ctx.ir('ajustes', null);
   const resp = c.querySelector('#resp');
@@ -172,6 +186,39 @@ export function hoy(ctx, c) {
       else comp.cumplidos[b.dataset.iso] = Date.now();
       try { await ctx.guardar(); } catch { return; }
       hoy(ctx, c);
+    };
+  });
+}
+
+/* ================= Detalle de una celda de la matriz ================= */
+
+function modalCelda(ctx, fila, mes, refrescar) {
+  if (!fila) return;
+  const e = ctx.sesion().estado;
+  const items = fila.porMes[mes];
+  const ESTADO = { pagado: ['Pagado', 'menta'], vencido: ['Vencido', 'rosa'], pendiente: ['Pendiente', 'suave'] };
+  const m = modal(`
+    <h2>${esc(fila.c.nombre)} · ${MESES[mes]}</h2>
+    ${items.map((o, i) => {
+      const [t, k] = o.tipo === 'ingreso' && o.pagado ? ['Recibido', 'menta'] : ESTADO[o.estado];
+      return `<div class="hist"><div><b>${esc(fechaCorta(o.fecha))}</b><div class="hist-n ${k}">${t}</div></div>
+        <div style="display:flex;align-items:center;gap:10px"><b>${o.tipo === 'ingreso' ? '+' : '−'} ${pesos(o.monto)}</b>
+        ${fila.c.esDeuda ? '' : `<button class="check${o.pagado ? ' on' : ''}" data-i="${i}" aria-label="Cambiar estado">${o.pagado ? '✓' : ''}</button>`}</div></div>`;
+    }).join('<div class="sep"></div>')}
+    <button class="btn sec" id="ed" style="max-width:none">${fila.c.esDeuda ? 'Ver deuda' : 'Editar compromiso'}</button>
+    <button class="volver" id="no" type="button" style="width:100%">Cerrar</button>`);
+  m.el.querySelector('#no').onclick = m.cerrar;
+  m.el.querySelector('#ed').onclick = () => { m.cerrar(); if (fila.c.esDeuda) ctx.ir('deudas', { vista: 'detalle', id: fila.c.id }); else ctx.ir('inicio', { vista: 'compromiso', id: fila.c.id }); };
+  m.el.querySelectorAll('button.check').forEach((b) => {
+    b.onclick = async () => {
+      const comp = e.compromisos.find((x) => x.id === fila.c.id);
+      const o = items[Number(b.dataset.i)];
+      if (!comp || !o) return;
+      comp.cumplidos = comp.cumplidos || {};
+      if (comp.cumplidos[o.iso]) delete comp.cumplidos[o.iso]; else comp.cumplidos[o.iso] = Date.now();
+      try { await ctx.guardar(); } catch { return; }
+      m.cerrar();
+      refrescar();
     };
   });
 }
