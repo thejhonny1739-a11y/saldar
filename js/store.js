@@ -16,8 +16,10 @@ export const estadoInicial = () => ({
   compromisos: [],
   categorias: categoriasBase(),
   espacios: espaciosBase(),
-  ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 }, espacioActivo: 'personal' }
+  ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 }, espacioActivo: 'personal', categoriasV2: true }
 });
+
+const NOMBRE_A_ID = { Comida: 'alimentacion', Supermercado: 'alimentacion', Transporte: 'transporte', Servicios: 'servicios', Salud: 'salud', Ropa: 'ropa', Entretenimiento: 'ocio', Hogar: 'hogar', 'Tecnología': 'tecnologia', Otros: 'otros' };
 
 // Completa campos que falten en datos guardados por versiones anteriores.
 // Nunca borra nada: solo agrega lo nuevo. Así actualizar la app no pierde información.
@@ -39,6 +41,15 @@ export function migrar(estado) {
   if (!Array.isArray(e.espacios) || e.espacios.length === 0) e.espacios = espaciosBase();
   if (!e.espacios.some((x) => x.id === e.ajustes.espacioActivo)) e.ajustes.espacioActivo = e.espacios[0].id;
   e.compromisos.forEach((c) => { if (!e.espacios.some((x) => x.id === c.espacioId)) c.espacioId = e.espacios[0].id; });
+  // Una sola vez: categorías unificadas entre compras y compromisos.
+  if (!(estado.ajustes && estado.ajustes.categoriasV2)) {
+    for (const k of categoriasBase()) if (!e.categorias.some((x) => x.id === k.id) && ['ropa', 'hogar', 'tecnologia'].includes(k.id)) e.categorias.push(k);
+    const ids = new Set(e.categorias.map((k) => k.id));
+    const aId = (v) => (ids.has(v) ? v : NOMBRE_A_ID[v] || 'otros');
+    e.compras.forEach((c) => { c.categoria = aId(c.categoria); });
+    Object.keys(e.aprendido.comercios).forEach((k) => { e.aprendido.comercios[k] = aId(e.aprendido.comercios[k]); });
+  }
+  e.ajustes.categoriasV2 = true;
   e.deudas.forEach((d) => { if (!Array.isArray(d.historial)) d.historial = []; });
   return e;
 }
@@ -95,7 +106,39 @@ export async function desbloquear(id, pin) {
   if (!p) throw new Error('Perfil no encontrado');
   const llave = await derivarLlave(pin, p.sal);
   const estado = migrar(await descifrar(llave, { iv: p.iv, ct: p.ct }));
+  await guardarCopiaDiaria(p);
   return { id: p.id, nombre: p.nombre, llave, estado };
+}
+
+/* ================= Copias automáticas ================= */
+// Cada día (al abrir con el PIN) se guarda dentro del teléfono una copia cifrada del estado anterior.
+// Sirven para deshacer errores; no reemplazan el respaldo en Archivos/iCloud (si pierdes el teléfono, se pierden).
+const DIA_MS = 86400000;
+const MAX_COPIAS = 7;
+
+async function guardarCopiaDiaria(p) {
+  try {
+    const copias = Array.isArray(p.copias) ? [...p.copias] : [];
+    const ult = copias[copias.length - 1];
+    if (ult && Date.now() - ult.f < DIA_MS) return;
+    copias.push({ f: Date.now(), iv: p.iv, ct: p.ct });
+    while (copias.length > MAX_COPIAS) copias.shift();
+    await tx('readwrite', (s) => s.put({ ...p, copias }));
+  } catch { /* si falla, no se bloquea el acceso */ }
+}
+
+export async function listarCopias(id) {
+  const p = await leerPerfil(id);
+  return ((p && p.copias) || []).map((c) => ({ f: c.f })).sort((a, b) => b.f - a.f);
+}
+
+// Vuelve a una copia. Antes guarda el estado actual como copia, para poder volver atrás.
+export async function restaurarCopia(id, f) {
+  const p = await leerPerfil(id);
+  const c = p && (p.copias || []).find((x) => x.f === f);
+  if (!c) throw new Error('Copia no encontrada');
+  const copias = [...p.copias, { f: Date.now(), iv: p.iv, ct: p.ct }].slice(-MAX_COPIAS);
+  await tx('readwrite', (s) => s.put({ ...p, iv: c.iv, ct: c.ct, copias }));
 }
 
 export async function guardar(sesion) {

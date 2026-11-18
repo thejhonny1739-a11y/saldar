@@ -8,7 +8,7 @@ import * as deudasUI from './deudas-ui.js';
 import * as compromisosUI from './compromisos-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '1.1.0';
+const VERSION_APP = '1.2.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -189,6 +189,7 @@ const ctx = {
   guardar: async () => {
     try { await store.guardar(sesion); } catch { aviso('No se pudo guardar. Intenta de nuevo.'); throw new Error('guardar'); }
   },
+  respaldar: () => exportarRespaldo(),
   ir(tab, subvista) {
     pestana = tab; sub = subvista || null; pantallaPrincipal(); },
   aviso
@@ -253,6 +254,8 @@ const VISTAS = {
         <div class="ajuste"><span>Almacenamiento protegido</span><b id="persist">…</b></div>
         <p class="nota">Tus deudas viven solo en este teléfono. Si borras la app o cambias de teléfono, se pierden. Guarda un respaldo en Archivos o iCloud: va cifrado con tu PIN y nadie lo puede leer sin él.</p>
       </div>
+      <div class="seccion">Copias automáticas</div>
+      <div class="card" id="copias"><div class="nota" style="margin:0">Cargando…</div></div>
       <button class="btn" id="respaldar" style="max-width:none;margin-top:0">Exportar respaldo</button>
       <button class="btn sec" id="restaurar" style="max-width:none">Restaurar desde un archivo</button>
       <button class="btn sec" id="recordar" style="max-width:none">Recordarme el respaldo cada mes</button>
@@ -342,7 +345,26 @@ async function buscarActualizacion() {
   location.reload();
 }
 
+async function pintarCopias() {
+  const caja = document.getElementById('copias');
+  if (!caja) return;
+  const lista = await store.listarCopias(sesion.id);
+  caja.innerHTML = `
+    <p class="nota" style="margin:0 0 10px">Cada día Saldar guarda en este teléfono una copia cifrada de tus datos (las últimas 7). Sirven para deshacer un error. <b>No reemplazan el respaldo en Archivos o iCloud</b>: si pierdes el teléfono, se pierden.</p>
+    ${lista.length ? lista.map((c) => `<div class="ajuste"><span>${esc(fechaLarga(c.f))}</span><button class="chip-btn" data-f="${c.f}">Restaurar</button></div>`).join('') : '<div class="nota" style="margin:0">Todavía no hay copias. Se crea la primera la próxima vez que abras Saldar con tu PIN.</div>'}`;
+  caja.querySelectorAll('[data-f]').forEach((b) => {
+    b.onclick = async () => {
+      const f = Number(b.dataset.f);
+      if (!confirm(`¿Volver a la copia del ${fechaLarga(f)}? Los cambios hechos después se perderán, aunque tu estado actual queda guardado como otra copia. Tendrás que entrar de nuevo con tu PIN.`)) return;
+      try { await store.restaurarCopia(sesion.id, f); } catch { aviso('No se pudo restaurar la copia.'); return; }
+      aviso('Copia restaurada. Entra con tu PIN.');
+      bloquear();
+    };
+  });
+}
+
 function enlazarAjustes() {
+  pintarCopias();
   navigator.storage?.persisted?.().then((p) => { const el = document.getElementById('persist'); if (el) el.textContent = p ? 'Sí' : 'No'; });
   document.getElementById('respaldar').onclick = exportarRespaldo;
   document.getElementById('restaurar').onclick = elegirRespaldo;

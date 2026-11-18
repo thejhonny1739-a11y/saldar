@@ -151,7 +151,7 @@ export function hoy(ctx, c) {
       <div><span class="etiqueta">${der[0]}</span><b class="${der[2]}">${pesos(der[1])}</b></div>
     </div>
     ${vencidas ? `<div class="alerta">Tienes ${vencidas} ${vencidas === 1 ? 'pago de deuda vencido' : 'pagos de deudas vencidos'}.</div>` : ''}
-    ${respaldoViejo ? '<button class="alerta info" id="resp">Haz un respaldo de tus datos: toca aquí.</button>' : ''}
+    ${respaldoViejo ? `<button class="alerta info" id="resp">${e.ajustes.ultimoRespaldo ? `Hace ${Math.floor((Date.now() - e.ajustes.ultimoRespaldo) / 86400000)} días que no haces un respaldo.` : 'Aún no has hecho un respaldo.'} Toca aquí para guardarlo ahora.</button>` : ''}
     ${cuerpo}
     ${e.deudas.length ? `<div class="seccion">Tus deudas</div>
       <button class="deuda" id="verdeudas"><div class="deuda-top"><span class="deuda-nombre">Total adeudado</span><span class="deuda-monto">${pesos(totalDeuda)}</span></div>
@@ -173,7 +173,7 @@ export function hoy(ctx, c) {
   c.querySelector('#espacio').onclick = () => modalEspacios(ctx, () => hoy(ctx, c));
   c.querySelector('#perfil').onclick = () => ctx.ir('ajustes', null);
   const resp = c.querySelector('#resp');
-  if (resp) resp.onclick = () => ctx.ir('ajustes', null);
+  if (resp) resp.onclick = () => ctx.respaldar();
   const vd = c.querySelector('#verdeudas');
   if (vd) vd.onclick = () => ctx.ir('deudas', null);
   c.querySelectorAll('.comp-main[data-id]').forEach((b) => { b.onclick = () => ctx.ir('inicio', { vista: 'compromiso', id: b.dataset.id }); });

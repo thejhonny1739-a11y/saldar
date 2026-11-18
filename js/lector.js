@@ -1,30 +1,29 @@
 // Lector flexible de mensajes del banco (SMS o correo). No depende del formato de un banco en particular:
 // busca monto, comercio, tarjeta y fecha con patrones comunes. Siempre se confirma con el usuario antes de guardar.
 
-export const CATEGORIAS = ['Comida', 'Supermercado', 'Transporte', 'Servicios', 'Salud', 'Ropa', 'Entretenimiento', 'Hogar', 'Tecnología', 'Otros'];
-
+// Las categorías de las compras son las mismas que las de los compromisos (ver compromisos.js).
 const PALABRAS_CATEGORIA = {
-  Comida: ['restaur', 'rappi', 'domicilios', 'mcdonald', 'kfc', 'burger', 'pizza', 'cafe', 'café', 'juan valdez', 'starbucks', 'crepes', 'sushi', 'panader', 'frisby', 'subway', 'dunkin'],
-  Supermercado: ['exito', 'éxito', 'jumbo', 'carulla', 'olimpica', 'olímpica', 'tienda d1', 'd1 ', 'ara ', 'surtimax', 'makro', 'pricesmart', 'metro ', 'supermerc', 'justo y bueno'],
-  Transporte: ['uber', 'didi', 'cabify', 'beat', 'terpel', 'primax', 'gasolin', 'esso', 'texaco', 'peaje', 'transmilenio', 'metro de', 'parqueader', 'indrive'],
-  Servicios: ['claro', 'movistar', 'tigo', 'wom', 'etb', 'epm', 'codensa', 'enel', 'vanti', 'acueducto', 'internet', 'netflix', 'spotify', 'disney', 'amazon prime', 'hbo', 'youtube'],
-  Salud: ['farmacia', 'drogueria', 'droguería', 'cruz verde', 'farmatodo', 'la rebaja', 'clinica', 'clínica', 'eps', 'laboratorio', 'medic', 'odontol'],
-  Ropa: ['zara', 'h&m', 'arturo calle', 'studio f', 'koaj', 'adidas', 'nike', 'falabella', 'offcorss', 'tennis', 'bershka'],
-  Entretenimiento: ['cine', 'cinemark', 'procinal', 'royal films', 'steam', 'playstation', 'xbox', 'nintendo', 'tuboleta', 'teatro', 'bar '],
-  Hogar: ['homecenter', 'easy', 'ikea', 'ferreter', 'muebles', 'sodimac'],
-  Tecnología: ['alkosto', 'ktronix', 'k-tronix', 'mercadolibre', 'mercado libre', 'apple', 'samsung', 'tecnolog', 'office depot', 'panamericana', 'google', 'microsoft']
+  alimentacion: ['restaur', 'rappi', 'domicilios', 'mcdonald', 'kfc', 'burger', 'pizza', 'cafe', 'café', 'juan valdez', 'starbucks', 'crepes', 'sushi', 'panader', 'frisby', 'subway', 'dunkin',
+    'exito', 'éxito', 'jumbo', 'carulla', 'olimpica', 'olímpica', 'tienda d1', 'd1 ', 'ara ', 'surtimax', 'makro', 'pricesmart', 'metro ', 'supermerc', 'justo y bueno'],
+  transporte: ['uber', 'didi', 'cabify', 'beat', 'terpel', 'primax', 'gasolin', 'esso', 'texaco', 'peaje', 'transmilenio', 'metro de', 'parqueader', 'indrive'],
+  servicios: ['claro', 'movistar', 'tigo', 'wom', 'etb', 'epm', 'codensa', 'enel', 'vanti', 'acueducto', 'internet'],
+  ocio: ['netflix', 'spotify', 'disney', 'amazon prime', 'hbo', 'youtube', 'cine', 'cinemark', 'procinal', 'royal films', 'steam', 'playstation', 'xbox', 'nintendo', 'tuboleta', 'teatro', 'bar '],
+  salud: ['farmacia', 'drogueria', 'droguería', 'cruz verde', 'farmatodo', 'la rebaja', 'clinica', 'clínica', 'eps', 'laboratorio', 'medic', 'odontol'],
+  ropa: ['zara', 'h&m', 'arturo calle', 'studio f', 'koaj', 'adidas', 'nike', 'falabella', 'offcorss', 'tennis', 'bershka'],
+  hogar: ['homecenter', 'easy', 'ikea', 'ferreter', 'muebles', 'sodimac'],
+  tecnologia: ['alkosto', 'ktronix', 'k-tronix', 'mercadolibre', 'mercado libre', 'apple', 'samsung', 'tecnolog', 'office depot', 'panamericana', 'google', 'microsoft']
 };
 
 export const normalizar = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 export function adivinarCategoria(comercio, aprendido = {}) {
   const n = normalizar(comercio);
-  if (!n) return 'Otros';
+  if (!n) return 'otros';
   if (aprendido[n]) return aprendido[n];
   for (const [cat, claves] of Object.entries(PALABRAS_CATEGORIA)) {
     if (claves.some((k) => n.includes(normalizar(k).trim()) )) return cat;
   }
-  return 'Otros';
+  return 'otros';
 }
 
 // "1.234.567,89" / "1,234,567.89" / "50.000" / "52300" -> número en pesos

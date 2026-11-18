@@ -6,7 +6,7 @@ import { analizar } from './capturas.js';
 import * as G from './graficas.js';
 import * as V from './vinculos.js';
 
-const COLOR_CAT = { Comida: '#ffb020', Supermercado: '#00d4a0', Transporte: '#3cc3d8', Servicios: '#8b5cf6', Salud: '#ff5a5f', Ropa: '#ff2d78', Entretenimiento: '#b79cff', Hogar: '#5b8def', 'Tecnología': '#9aa5b1', Otros: '#6b7480' };
+const categoriaDe = (e, id) => (e.categorias || []).find((k) => k.id === id) || { id: 'otros', nombre: 'Otros', icono: '📦', color: '#9aa5b1' };
 
 let borrador = null; // datos pre-llenados (por ejemplo desde un mensaje leído)
 
@@ -30,7 +30,7 @@ export function lista(ctx, c) {
     }
     grupos += `<button class="deuda" data-id="${esc(x.id)}">
       <div class="deuda-top"><span class="deuda-nombre">${esc(x.comercio)}</span><span class="deuda-monto">${pesos(x.monto)}</span></div>
-      <div class="deuda-sub">${esc(x.categoria)}${x.tarjeta ? ` · •••• ${esc(x.tarjeta)}` : x.tarjetaNombre ? ` · ${esc(x.tarjetaNombre)}` : ''}${x.aplicado ? ` · <span class="menta">suma a ${esc((e.deudas.find((d) => d.id === x.deudaId) || {}).nombre || 'tu tarjeta')}</span>` : ''}${x.revisar ? ' · <b class="ambar">Revisar</b>' : ''}</div></button>`;
+      <div class="deuda-sub">${esc(categoriaDe(e, x.categoria).nombre)}${x.tarjeta ? ` · •••• ${esc(x.tarjeta)}` : x.tarjetaNombre ? ` · ${esc(x.tarjetaNombre)}` : ''}${x.aplicado ? ` · <span class="menta">suma a ${esc((e.deudas.find((d) => d.id === x.deudaId) || {}).nombre || 'tu tarjeta')}</span>` : ''}${x.revisar ? ' · <b class="ambar">Revisar</b>' : ''}</div></button>`;
   }
 
   let resumen = '';
@@ -43,7 +43,7 @@ export function lista(ctx, c) {
       const nom = d ? d.nombre : x.tarjeta ? `•••• ${x.tarjeta}` : x.tarjetaNombre || 'Sin tarjeta';
       porTarjeta.set(nom, (porTarjeta.get(nom) || 0) + x.monto);
     }
-    resumen = G.dona([...porCat].map(([nombre, valor]) => ({ nombre, valor, color: COLOR_CAT[nombre] || '#9aa5b1' })), 'Este mes', pesos(totalMes))
+    resumen = G.dona([...porCat].map(([id, valor]) => { const k = categoriaDe(e, id); return { nombre: k.nombre, icono: k.icono, valor, color: k.color }; }), 'Este mes', pesos(totalMes))
       + `<div class="card"><div class="etiqueta" style="margin-bottom:8px">Por tarjeta</div>${[...porTarjeta].sort((a, b) => b[1] - a[1]).map(([n, v]) => `<div class="ajuste"><span>${esc(n)}</span><b>${pesos(v)}</b></div>`).join('')}</div>`;
   }
 
@@ -131,7 +131,7 @@ export function formulario(ctx, c, id) {
   if (id && !x) return ctx.ir('compras', null);
   const hoy = aISO(new Date());
   const b = x || borrador || {};
-  const v = { comercio: b.comercio || '', monto: b.monto || 0, fecha: b.fecha || hoy, tarjeta: b.tarjeta || '', categoria: b.categoria || 'Otros', nota: b.nota || '' };
+  const v = { comercio: b.comercio || '', monto: b.monto || 0, fecha: b.fecha || hoy, tarjeta: b.tarjeta || '', categoria: b.categoria || 'otros', nota: b.nota || '' };
   const leido = !x && b.leido;
 
   c.innerHTML = `
@@ -147,7 +147,7 @@ export function formulario(ctx, c, id) {
         <label>Tarjeta (4 dígitos)<input name="tarjeta" inputmode="numeric" maxlength="4" value="${esc(v.tarjeta)}" placeholder="Opcional" autocomplete="off"></label>
       </div>
       <p class="nota" id="vinc" style="margin:-4px 0 14px"></p>
-      <label>Categoría<select name="categoria">${L.CATEGORIAS.map((k) => `<option${k === v.categoria ? ' selected' : ''}>${k}</option>`).join('')}</select></label>
+      <label>Categoría<select name="categoria">${e.categorias.filter((k) => k.tipo === 'gasto').map((k) => `<option value="${esc(k.id)}"${k.id === v.categoria ? ' selected' : ''}>${esc(k.icono)} ${esc(k.nombre)}</option>`).join('')}</select></label>
       <label>Nota (opcional)<input name="nota" maxlength="80" value="${esc(v.nota)}" autocomplete="off"></label>
       <div class="error" id="err"></div>
       <button class="btn" type="submit" style="max-width:none">${x ? 'Guardar cambios' : 'Guardar compra'}</button>
@@ -239,7 +239,7 @@ function modalResumen(ctx, r) {
       <div class="ajuste"><span>No entendidas</span><b>${r.ilegibles.length}</b></div>
     </div>
     ${hay ? `<div style="max-height:32vh;overflow-y:auto;margin-bottom:12px">${r.nuevas.map((c) => `
-      <div class="hist"><div><b>${esc(c.comercio)}</b>${c.revisar ? ' <span class="ambar">· Revisar</span>' : ''}<div class="hist-n">${esc(c.categoria)}${c.tarjeta ? ` · •••• ${esc(c.tarjeta)}` : ''}</div></div>
+      <div class="hist"><div><b>${esc(c.comercio)}</b>${c.revisar ? ' <span class="ambar">· Revisar</span>' : ''}<div class="hist-n">${esc(categoriaDe(e, c.categoria).nombre)}${c.tarjeta ? ` · •••• ${esc(c.tarjeta)}` : ''}</div></div>
       <div style="text-align:right"><b>${pesos(c.monto)}</b><div class="hist-n">${esc(fechaCorta(desdeISO(c.fecha)))}</div></div></div>`).join('<div class="sep"></div>')}</div>` : ''}`}
     ${r.total > 0 && (hay || r.ilegibles.length || r.ingresos) ? `<button class="btn" id="ok" style="max-width:none">${hay ? `Guardar ${r.nuevas.length} ${r.nuevas.length === 1 ? 'compra' : 'compras'}` : 'Listo'}</button>` : ''}
     <button class="volver" id="no" type="button" style="width:100%">${r.total === 0 ? 'Cerrar' : 'Cancelar'}</button>`);
