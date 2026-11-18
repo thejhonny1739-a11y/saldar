@@ -1,0 +1,129 @@
+:root {
+  --bg: #121417;
+  --card: #1c2025;
+  --card-2: #262b32;
+  --borde: #2d333b;
+  --texto: #eef1f4;
+  --suave: #8a939c;
+  --menta: #00d4a0;
+  --rosa: #ff2d78;
+  --morado: #8b5cf6;
+  --grad: linear-gradient(90deg, #8b5cf6, #ff2d78);
+  --radio: 16px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--texto); }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  user-select: none; -webkit-user-select: none;
+}
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+input { font: inherit; color: inherit; user-select: text; -webkit-user-select: text; }
+
+#app { height: 100%; display: flex; flex-direction: column; }
+
+/* ---------- Pantallas de acceso ---------- */
+.acceso {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: calc(var(--safe-top) + 48px) 24px calc(var(--safe-bottom) + 24px);
+  overflow-y: auto;
+}
+.logo {
+  width: 64px; height: 64px; border-radius: 18px; background: var(--grad);
+  display: grid; place-items: center; font-size: 32px; font-weight: 800; color: #fff;
+  box-shadow: 0 10px 30px rgba(255, 45, 120, .25);
+}
+.acceso h1 { margin: 20px 0 4px; font-size: 28px; letter-spacing: -.5px; }
+.acceso p.sub { margin: 0 0 28px; color: var(--suave); text-align: center; min-height: 1.3em; }
+.lista-perfiles { width: 100%; max-width: 360px; display: grid; gap: 10px; }
+.perfil {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; width: 100%;
+  background: var(--card); border: 1px solid var(--borde); border-radius: var(--radio); text-align: left;
+}
+.perfil:active { background: var(--card-2); }
+.avatar {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--grad);
+  display: grid; place-items: center; font-weight: 700; color: #fff; flex: none;
+}
+.perfil .nombre { font-size: 17px; font-weight: 600; }
+.perfil.nuevo { border-style: dashed; color: var(--menta); }
+.perfil.nuevo .avatar { background: transparent; border: 1.5px solid var(--menta); color: var(--menta); }
+
+.campo { width: 100%; max-width: 360px; }
+.campo input {
+  width: 100%; padding: 14px 16px; font-size: 17px; background: var(--card);
+  border: 1px solid var(--borde); border-radius: var(--radio); outline: none;
+}
+.campo input:focus { border-color: var(--morado); }
+.btn {
+  width: 100%; max-width: 360px; margin-top: 14px; padding: 14px; font-size: 17px; font-weight: 600;
+  border-radius: var(--radio); background: var(--grad); color: #fff;
+}
+.btn:disabled { opacity: .4; }
+.btn.sec { background: var(--card); border: 1px solid var(--borde); color: var(--texto); }
+.btn.peligro { background: transparent; border: 1px solid var(--rosa); color: var(--rosa); }
+.volver { margin-top: 18px; color: var(--suave); padding: 10px; }
+
+/* Teclado de PIN */
+.puntos { display: flex; gap: 14px; margin-bottom: 28px; height: 16px; }
+.punto { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--suave); transition: .12s; }
+.punto.on { background: var(--menta); border-color: var(--menta); }
+.puntos.error .punto { border-color: var(--rosa); background: var(--rosa); }
+.puntos.error { animation: sacudir .35s; }
+@keyframes sacudir { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.teclado { display: grid; grid-template-columns: repeat(3, 76px); gap: 14px 22px; }
+.tecla {
+  width: 76px; height: 76px; border-radius: 50%; background: var(--card);
+  font-size: 28px; font-weight: 500; display: grid; place-items: center;
+}
+.tecla:active { background: var(--card-2); }
+.tecla.vacia { background: none; pointer-events: none; }
+.tecla.borrar { background: none; font-size: 20px; color: var(--suave); }
+
+/* ---------- App principal ---------- */
+.contenido {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: calc(var(--safe-top) + 20px) 18px 24px;
+}
+.contenido h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -.5px; }
+.saludo { color: var(--suave); margin: 0 0 20px; }
+.card { background: var(--card); border-radius: var(--radio); padding: 18px; margin-bottom: 14px; border: 1px solid var(--borde); }
+.etiqueta { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--suave); }
+.cifra { font-size: 34px; font-weight: 700; margin-top: 6px; letter-spacing: -.5px; }
+.fila { display: flex; gap: 12px; }
+.fila > .card { flex: 1; margin-bottom: 14px; }
+.mini .etiqueta.menta { color: var(--menta); }
+.mini .etiqueta.rosa { color: var(--rosa); }
+.mini .cifra { font-size: 22px; }
+.vacio { text-align: center; color: var(--suave); padding: 28px 18px; line-height: 1.5; }
+.vacio b { color: var(--texto); display: block; margin-bottom: 6px; font-size: 17px; }
+.insignia {
+  display: inline-block; margin-top: 12px; padding: 4px 10px; font-size: 12px; border-radius: 999px;
+  background: rgba(139, 92, 246, .15); color: #b79cff;
+}
+.ajuste { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.ajuste + .ajuste { border-top: 1px solid var(--borde); margin-top: 8px; padding-top: 14px; }
+
+/* Barra inferior */
+nav {
+  display: flex; background: rgba(28, 32, 37, .96); border-top: 1px solid var(--borde);
+  padding: 8px 6px calc(var(--safe-bottom) + 8px);
+}
+nav button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 11px; color: var(--suave); padding: 4px 0;
+}
+nav button svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+nav button.activo { color: var(--menta); }
+
+/* Aviso */
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 90px); transform: translateX(-50%);
+  background: var(--card-2); border: 1px solid var(--borde); padding: 10px 16px; border-radius: 999px;
+  font-size: 14px; max-width: 90%; z-index: 10;
+}
