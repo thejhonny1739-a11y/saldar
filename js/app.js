@@ -4,7 +4,7 @@ import { esc, fechaLarga } from './util.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.3';
+const VERSION_APP = '0.3.1';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -234,6 +234,7 @@ const VISTAS = {
         <div class="ajuste"><span>Perfil</span><b>${esc(sesion.nombre)}</b></div>
         <div class="ajuste"><span>Moneda</span><b>${esc(sesion.estado.ajustes.moneda)}</b></div>
         <div class="ajuste"><span>Versión</span><b>Saldar ${VERSION_APP}</b></div>
+        <div class="ajuste"><span>Pantalla</span><b id="diag" style="font-size:13px;text-align:right">…</b></div>
       </div>
       <div class="seccion">Tus datos</div>
       <div class="card">
@@ -314,6 +315,17 @@ async function buscarActualizacion() {
 }
 
 function enlazarAjustes() {
+  // Diagnóstico de pantalla (para ajustar la barra inferior en el iPhone).
+  const sonda = document.createElement('div');
+  sonda.style.cssText = 'position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top)';
+  document.body.appendChild(sonda);
+  const cs = getComputedStyle(sonda);
+  const barra = document.querySelector('nav').getBoundingClientRect();
+  const vv = window.visualViewport;
+  document.getElementById('diag').innerHTML =
+    `pantalla ${screen.width}×${screen.height}<br>ventana ${innerWidth}×${innerHeight}<br>visual ${Math.round(vv?.width || 0)}×${Math.round(vv?.height || 0)}<br>` +
+    `seguro arriba ${cs.paddingTop} abajo ${cs.paddingBottom}<br>fin barra ${Math.round(barra.bottom)} · modo ${navigator.standalone ? 'app' : 'safari'}`;
+  sonda.remove();
   navigator.storage?.persisted?.().then((p) => { const el = document.getElementById('persist'); if (el) el.textContent = p ? 'Sí' : 'No'; });
   document.getElementById('respaldar').onclick = exportarRespaldo;
   document.getElementById('restaurar').onclick = elegirRespaldo;
