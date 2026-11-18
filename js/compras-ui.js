@@ -198,10 +198,19 @@ export function formulario(ctx, c, id) {
   const del = c.querySelector('#eliminar');
   if (del) del.onclick = async () => {
     if (!confirm(`¿Eliminar la compra en "${x.comercio}"? Esto no se puede deshacer.`)) return;
+    const copia = { ...x };
+    const estabaSumada = !!x.aplicado;
     V.revertir(e, x);
     e.compras = e.compras.filter((k) => k.id !== x.id);
     await ctx.guardar();
-    ctx.aviso('Compra eliminada');
+    ctx.aviso('Compra eliminada', async () => {
+      copia.aplicado = 0;
+      delete copia.deudaId;
+      e.compras.push(copia);
+      if (estabaSumada) V.aplicar(e, copia, true);
+      await ctx.guardar();
+      ctx.ir('compras', null);
+    });
     ctx.ir('compras', null);
   };
 }

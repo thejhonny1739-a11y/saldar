@@ -353,3 +353,15 @@ nav button[data-tab] { min-width: 0; }
 .ejemplo:active { color: var(--menta); }
 .asis-txt { display: block; width: 100%; margin-top: 10px; padding: 13px 14px; font-size: 17px; font-family: inherit; color: var(--texto); background: var(--card); border: 1px solid var(--borde); border-radius: 14px; outline: none; resize: none; user-select: text; -webkit-user-select: text; }
 .asis-txt:focus { border-color: var(--morado); }
+
+/* ---------- Deshacer y búsqueda ---------- */
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-btn { color: var(--menta); font-weight: 700; padding: 2px 4px; white-space: nowrap; }
+.enc-acc { display: flex; align-items: center; gap: 10px; flex: none; }
+.icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--card-2); display: grid; place-items: center; }
+.icon-btn svg { width: 20px; height: 20px; stroke: var(--texto); fill: none; stroke-width: 2; stroke-linecap: round; }
+.res-fila { padding: 10px 0; }
+.res-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.res-txt b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-txt small { color: var(--suave); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-monto { flex: none; font-size: 14px; }

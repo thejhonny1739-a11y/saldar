@@ -174,17 +174,23 @@ export function detalle(ctx, c, id) {
 
   c.querySelector('#eliminar').onclick = async () => {
     if (!confirm(`¿Eliminar "${d.nombre}" y todo su historial? Esto no se puede deshacer.`)) return;
+    const pagosDeuda = e.pagos.filter((x) => x.deudaId === d.id);
     e.deudas = e.deudas.filter((x) => x.id !== d.id);
     e.pagos = e.pagos.filter((x) => x.deudaId !== d.id);
     await ctx.guardar();
-    ctx.aviso('Deuda eliminada');
+    ctx.aviso('Deuda eliminada', async () => {
+      e.deudas.push(d);
+      e.pagos.push(...pagosDeuda);
+      await ctx.guardar();
+      ctx.ir('deudas', null);
+    });
     ctx.ir('deudas', null);
   };
 }
 
-function modalAbono(ctx, d) {
+export function modalAbono(ctx, d, { sugerido: sug, despues } = {}) {
   const hoy = C.aISO(new Date());
-  const sugerido = Math.min(d.cuota || d.saldo, d.saldo);
+  const sugerido = Math.min(sug || d.cuota || d.saldo, d.saldo);
   const m = modal(`
     <h2>Registrar abono</h2>
     <form id="fa">
@@ -213,7 +219,7 @@ function modalAbono(ctx, d) {
     await ctx.guardar();
     m.cerrar();
     ctx.aviso(d.saldo <= 0 ? '¡Deuda liquidada!' : 'Abono registrado');
-    ctx.ir('deudas', { vista: 'detalle', id: d.id });
+    if (despues) despues(); else ctx.ir('deudas', { vista: 'detalle', id: d.id });
   };
 }
 

@@ -8,7 +8,7 @@ import * as deudasUI from './deudas-ui.js';
 import * as compromisosUI from './compromisos-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '1.2.0';
+const VERSION_APP = '1.3.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -19,12 +19,20 @@ let ocultoDesde = 0;
 
 const inicial = (nombre) => esc((nombre.trim()[0] || '?').toUpperCase());
 
-function aviso(texto) {
+// Aviso breve. Con `deshacer` (una función) muestra el botón "Deshacer" durante unos segundos.
+function aviso(texto, deshacer) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = texto;
+  if (deshacer) {
+    const b = document.createElement('button');
+    b.className = 'toast-btn';
+    b.textContent = 'Deshacer';
+    b.onclick = async () => { t.remove(); try { await deshacer(); } catch { /* sesión cerrada u otro fallo */ } };
+    t.appendChild(b);
+  }
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2600);
+  setTimeout(() => t.remove(), deshacer ? 8000 : 2600);
 }
 
 /* ================= Acceso ================= */

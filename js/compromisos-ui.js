@@ -4,6 +4,8 @@ import { parseMonto, aISO, situacion } from './calculos.js';
 import * as K from './compromisos.js';
 import * as G from './graficas.js';
 import { entender, EJEMPLOS } from './asistente.js';
+import { buscar } from './busqueda.js';
+import * as deudasUI from './deudas-ui.js';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MES3 = MESES.map((m) => m.slice(0, 3));
@@ -96,7 +98,7 @@ export function hoy(ctx, c) {
           <span class="pill ${o.tipo === 'ingreso' ? 'ing' : ''}">${o.tipo === 'ingreso' ? '+' : '−'} ${pesos(o.monto)}</span>
         </button>
         ${o.c.esDeuda
-          ? `<span class="check fijo${o.pagado ? ' on' : ''}" title="Se registra con un abono">${o.pagado ? '✓' : ''}</span>`
+          ? `<button class="check${o.pagado ? ' on' : ''}" data-abono="${esc(o.c.id)}" data-monto="${o.monto}" data-actual="${o.fecha.getFullYear() === ahora.getFullYear() && o.fecha.getMonth() === ahora.getMonth() ? 1 : ''}" data-pagado="${o.pagado ? 1 : ''}" aria-label="Registrar abono">${o.pagado ? '✓' : ''}</button>`
           : `<button class="check${o.pagado ? ' on' : ''}" data-id="${esc(o.c.id)}" data-iso="${o.iso}" aria-label="${o.tipo === 'ingreso' ? 'Marcar como recibido' : 'Marcar como pagado'}">${o.pagado ? '✓' : ''}</button>`}
       </div>`;
   };
@@ -139,7 +141,7 @@ export function hoy(ctx, c) {
   c.innerHTML = `
     <div class="encabezado">
       <button class="espacio-chip" id="espacio">${ico(esp, 'peq')}<b>${esc(esp.nombre)}</b><span class="flecha-txt">›</span>${pendientes ? `<em class="punto-aviso" title="Pendientes esta semana"></em>` : ''}</button>
-      <button class="avatar-btn" id="perfil" aria-label="Ajustes">${esc((s.nombre.trim()[0] || '?').toUpperCase())}</button>
+      <span class="enc-acc"><button class="icon-btn" id="buscar" aria-label="Buscar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button><button class="avatar-btn" id="perfil" aria-label="Ajustes">${esc((s.nombre.trim()[0] || '?').toUpperCase())}</button></span>
     </div>
     <div class="periodos">${[['anual', 'Anual'], ['mensual', 'Mensual'], ['semanal', 'Semanal']].map(([k, t]) => `<button data-p="${k}" class="${periodo === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <div class="meses"><button class="flecha" id="ant" aria-label="Anterior">‹</button>${nav}<button class="flecha" id="sig" aria-label="Siguiente">›</button></div>
@@ -172,13 +174,23 @@ export function hoy(ctx, c) {
   });
   c.querySelector('#espacio').onclick = () => modalEspacios(ctx, () => hoy(ctx, c));
   c.querySelector('#perfil').onclick = () => ctx.ir('ajustes', null);
+  c.querySelector('#buscar').onclick = () => buscar(ctx);
   const resp = c.querySelector('#resp');
   if (resp) resp.onclick = () => ctx.respaldar();
   const vd = c.querySelector('#verdeudas');
   if (vd) vd.onclick = () => ctx.ir('deudas', null);
   c.querySelectorAll('.comp-main[data-id]').forEach((b) => { b.onclick = () => ctx.ir('inicio', { vista: 'compromiso', id: b.dataset.id }); });
   c.querySelectorAll('.comp-main[data-deuda]').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'detalle', id: b.dataset.deuda }); });
-  c.querySelectorAll('button.check').forEach((b) => {
+  c.querySelectorAll('button.check[data-abono]').forEach((b) => {
+    b.onclick = () => {
+      const d = e.deudas.find((x) => x.id === b.dataset.abono);
+      if (!d) return;
+      // Solo se abona desde aquí la cuota del mes actual; lo demás se ve en el detalle de la deuda.
+      if (b.dataset.pagado || !b.dataset.actual || d.saldo <= 0) { ctx.ir('deudas', { vista: 'detalle', id: d.id }); return; }
+      deudasUI.modalAbono(ctx, d, { sugerido: Number(b.dataset.monto), despues: () => hoy(ctx, c) });
+    };
+  });
+  c.querySelectorAll('button.check[data-id]').forEach((b) => {
     b.onclick = async () => {
       const comp = e.compromisos.find((x) => x.id === b.dataset.id);
       if (!comp) return;
@@ -388,9 +400,10 @@ export function formulario(ctx, c, id, borrador) {
   if (comp) {
     c.querySelector('#borrar').onclick = async () => {
       if (!confirm(`¿Eliminar “${comp.nombre}” y todo su historial de pagos? Esto no se puede deshacer.`)) return;
+      const copia = { ...comp, cumplidos: { ...(comp.cumplidos || {}) } };
       e.compromisos = e.compromisos.filter((x) => x.id !== comp.id);
       try { await ctx.guardar(); } catch { return; }
-      ctx.aviso('Compromiso eliminado');
+      ctx.aviso('Compromiso eliminado', async () => { e.compromisos.push(copia); await ctx.guardar(); ctx.ir('inicio', null); });
       ctx.ir('inicio', null);
     };
   }
@@ -564,11 +577,21 @@ function editarEspacio(ctx, esp, despues) {
   if (del) del.onclick = async () => {
     const n = e.compromisos.filter((x) => x.espacioId === esp.id).length;
     if (!confirm(n ? `Se eliminará el espacio “${esp.nombre}” y sus ${n} compromiso(s). No se puede deshacer. ¿Continuar?` : `¿Eliminar el espacio “${esp.nombre}”?`)) return;
+    const copiaEsp = { ...esp };
+    const compsEsp = e.compromisos.filter((x) => x.espacioId === esp.id);
+    const eraActivo = e.ajustes.espacioActivo === esp.id;
     e.compromisos = e.compromisos.filter((x) => x.espacioId !== esp.id);
     e.espacios = e.espacios.filter((x) => x.id !== esp.id);
-    if (e.ajustes.espacioActivo === esp.id) e.ajustes.espacioActivo = e.espacios[0].id;
+    if (eraActivo) e.ajustes.espacioActivo = e.espacios[0].id;
     try { await ctx.guardar(); } catch { return; }
     m.cerrar();
     despues(null, true);
+    ctx.aviso(`Espacio “${copiaEsp.nombre}” eliminado`, async () => {
+      e.espacios.push(copiaEsp);
+      e.compromisos.push(...compsEsp);
+      if (eraActivo) e.ajustes.espacioActivo = copiaEsp.id;
+      await ctx.guardar();
+      despues(copiaEsp.id, false);
+    });
   };
 }
