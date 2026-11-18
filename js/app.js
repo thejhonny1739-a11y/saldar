@@ -7,9 +7,10 @@ import { respaldoICS } from './ics.js';
 import * as deudasUI from './deudas-ui.js';
 import * as compromisosUI from './compromisos-ui.js';
 import * as cuentasUI from './cuentas-ui.js';
+import * as nube from './nube.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '1.5.0';
+const VERSION_APP = '1.6.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -128,6 +129,7 @@ function pedirPin(perfil) {
       pestana = 'inicio';
       sub = null;
       pantallaPrincipal();
+      sincronizarNube(false);
     }
   });
 }
@@ -196,7 +198,10 @@ const TITULOS = { inicio: 'Hoy', deudas: 'Deudas', calendario: 'Calendario', com
 const ctx = {
   sesion: () => sesion,
   guardar: async () => {
+    const n = sesion.estado.ajustes.nube;
+    if (n) { n.sucio = true; nube.marcarCambio(); }
     try { await store.guardar(sesion); } catch { aviso('No se pudo guardar. Intenta de nuevo.'); throw new Error('guardar'); }
+    programarNube();
   },
   respaldar: () => exportarRespaldo(),
   ir(tab, subvista) {
@@ -265,6 +270,8 @@ const VISTAS = {
         <div class="ajuste"><span>Almacenamiento protegido</span><b id="persist">…</b></div>
         <p class="nota">Tus deudas viven solo en este teléfono. Si borras la app o cambias de teléfono, se pierden. Guarda un respaldo en Archivos o iCloud: va cifrado con tu PIN y nadie lo puede leer sin él.</p>
       </div>
+      <div class="seccion">Nube (ver tus datos en el computador)</div>
+      <div class="card" id="nube"></div>
       <div class="seccion">Copias automáticas</div>
       <div class="card" id="copias"><div class="nota" style="margin:0">Cargando…</div></div>
       <button class="btn" id="respaldar" style="max-width:none;margin-top:0">Exportar respaldo</button>
@@ -374,7 +381,116 @@ async function pintarCopias() {
   });
 }
 
+/* ================= Nube ================= */
+let nubeOcupada = false;
+let nubeTimer = null;
+
+function programarNube() {
+  if (!sesion || !sesion.estado.ajustes.nube) return;
+  clearTimeout(nubeTimer);
+  nubeTimer = setTimeout(() => sincronizarNube(false), 3000);
+}
+
+// `manual`: el usuario tocó el botón (muestra avisos de error y repinta). Sin manual, solo avisa si bajó datos.
+async function sincronizarNube(manual, resolver = null) {
+  if (!sesion || !sesion.estado.ajustes.nube || nubeOcupada) return;
+  nubeOcupada = true;
+  const miSesion = sesion;
+  let r;
+  try { r = await nube.sincronizar(sesion, () => store.guardar(sesion), { resolver }); } finally { nubeOcupada = false; }
+  if (sesion !== miSesion) return;
+  if (r.accion === 'bajado') {
+    aviso('Datos actualizados desde la nube');
+    if (!sub) pantallaPrincipal();
+  } else if (r.accion === 'conflicto') {
+    preguntarConflicto();
+  } else if (r.accion === 'error' && manual) {
+    aviso(r.mensaje);
+  } else if (r.accion === 'subido' && manual) {
+    aviso('Nube al día');
+  } else if (r.accion === 'nada' && manual) {
+    aviso('Nube al día');
+  }
+  pintarNube();
+}
+
+function preguntarConflicto() {
+  const m = modal(`
+    <h2>Cambios en dos lados</h2>
+    <p class="nota">Hay datos más nuevos en la nube y también cambios sin enviar en este dispositivo. Elige cuál conservar. Lo otro se pierde.</p>
+    <button class="btn" id="c-nube" style="max-width:none">Usar lo de la nube</button>
+    <button class="btn sec" id="c-aqui" style="max-width:none">Usar lo de este dispositivo</button>
+    <button class="volver" id="c-no" type="button" style="width:100%">Decidir después</button>`);
+  m.el.querySelector('#c-no').onclick = m.cerrar;
+  m.el.querySelector('#c-nube').onclick = () => { m.cerrar(); sincronizarNube(true, 'nube'); };
+  m.el.querySelector('#c-aqui').onclick = () => { m.cerrar(); sincronizarNube(true, 'local'); };
+}
+
+function pintarNube() {
+  const caja = document.getElementById('nube');
+  if (!caja || !sesion) return;
+  const n = sesion.estado.ajustes.nube;
+  if (!n) {
+    caja.innerHTML = `
+      <p class="nota" style="margin:0 0 10px">Guarda una copia cifrada en internet para abrir Saldar en el computador con los mismos datos. Solo tú puedes leerla: se cifra aquí con una contraseña larga que el servidor nunca recibe.</p>
+      <button class="btn" id="n-conectar" style="max-width:none;margin-top:0">Conectar la nube</button>`;
+    caja.querySelector('#n-conectar').onclick = abrirConectarNube;
+    return;
+  }
+  caja.innerHTML = `
+    <div class="ajuste"><span>Estado</span><b>${n.sucio ? 'Cambios sin enviar' : 'Al día'}</b></div>
+    <div class="ajuste"><span>Última sincronización</span><b>${n.ultima ? esc(fechaLarga(n.ultima)) : 'Nunca'}</b></div>
+    <button class="btn" id="n-sync" style="max-width:none">Sincronizar ahora</button>
+    <button class="btn sec" id="n-fuera" style="max-width:none">Desconectar este dispositivo</button>
+    <p class="nota">Desconectar no borra lo que ya está en la nube. En otro dispositivo: crea un perfil, abre Ajustes y conecta con la misma dirección y contraseña.</p>`;
+  caja.querySelector('#n-sync').onclick = () => sincronizarNube(true);
+  caja.querySelector('#n-fuera').onclick = async () => {
+    if (!confirm('¿Desconectar la nube en este dispositivo? Tus datos locales y los de la nube se quedan como están.')) return;
+    nube.desconectar(sesion.estado);
+    try { await store.guardar(sesion); } catch { aviso('No se pudo guardar.'); return; }
+    pintarNube();
+  };
+}
+
+function abrirConectarNube() {
+  const m = modal(`
+    <h2>Conectar la nube</h2>
+    <form id="n-form" class="formulario">
+      <label>Dirección del servicio<input name="url" inputmode="url" placeholder="https://saldar-nube.tu-usuario.workers.dev" autocomplete="off" autocapitalize="off" required></label>
+      <label>Contraseña larga (mínimo ${nube.MIN_CLAVE} caracteres)<input name="clave" type="password" autocomplete="off" required></label>
+      <p class="nota">Usa una frase que solo tú sepas, distinta de tu PIN. <b>Si la olvidas, los datos de la nube no se pueden recuperar</b> (los de tu teléfono siguen ahí). En el computador debes escribir exactamente la misma.</p>
+      <div class="error" id="n-err"></div>
+      <button class="btn" type="submit" id="n-ok" style="max-width:none">Conectar</button>
+      <button class="volver" id="n-no" type="button" style="width:100%">Cancelar</button>
+    </form>`);
+  m.el.querySelector('#n-no').onclick = m.cerrar;
+  m.el.querySelector('#n-form').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const f = ev.target.elements;
+    const err = m.el.querySelector('#n-err');
+    const ok = m.el.querySelector('#n-ok');
+    err.textContent = '';
+    ok.disabled = true; ok.textContent = 'Conectando…';
+    try {
+      const r = await nube.conectar(sesion, f.url.value, f.clave.value);
+      if (r.existe && !confirm('En la nube ya hay datos de Saldar. ¿Descargarlos y reemplazar lo que hay en este dispositivo?')) {
+        ok.disabled = false; ok.textContent = 'Conectar';
+        return;
+      }
+      sesion.estado.ajustes.nube = r.nube;
+      await store.guardar(sesion);
+      m.cerrar();
+      await sincronizarNube(true, r.existe ? 'nube' : null);
+      pintarNube();
+    } catch (e) {
+      err.textContent = e.message || 'No se pudo conectar.';
+      ok.disabled = false; ok.textContent = 'Conectar';
+    }
+  };
+}
+
 function enlazarAjustes() {
+  pintarNube();
   pintarCopias();
   navigator.storage?.persisted?.().then((p) => { const el = document.getElementById('persist'); if (el) el.textContent = p ? 'Sí' : 'No'; });
   document.getElementById('respaldar').onclick = exportarRespaldo;
@@ -417,6 +533,8 @@ document.addEventListener('visibilitychange', () => {
     ocultoDesde = Date.now();
   } else if (sesion && ocultoDesde && Date.now() - ocultoDesde > BLOQUEO_SEGUNDOS * 1000) {
     bloquear();
+  } else if (sesion && !sub) {
+    sincronizarNube(false);
   }
 });
 

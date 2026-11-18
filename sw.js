@@ -1,6 +1,6 @@
 // Service worker de Saldar: guarda la app en caché para que abra sin internet.
 // Al cambiar cualquier archivo, sube el número de VERSION.
-const VERSION = 'saldar-v20';
+const VERSION = 'saldar-v21';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -25,6 +25,7 @@ const ARCHIVOS = [
   './js/busqueda.js',
   './js/cuentas.js',
   './js/cuentas-ui.js',
+  './js/nube.js',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png'

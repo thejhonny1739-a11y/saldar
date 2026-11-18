@@ -380,3 +380,8 @@ nav button[data-tab] { min-width: 0; }
 .proy-card b.menta { color: var(--menta); } .proy-card b.rosa { color: var(--rosa); }
 .proy-sub { color: var(--suave); font-size: 12px; }
 .proy-alerta { color: #ff8fb4; font-size: 13px; margin-top: 2px; }
+
+/* Computador: columna más ancha */
+@media (min-width: 900px) {
+  .contenido, nav, .acceso { max-width: 760px; }
+}
