@@ -2,6 +2,7 @@
 // `ctx` lo entrega app.js: { sesion(), guardar(), ir(tab, sub), aviso(texto) }.
 import { esc, pesos, miles, fechaCorta, mesAnio, desdeISO, modal, enlazarMonto } from './util.js';
 import * as C from './calculos.js';
+import * as V from './vinculos.js';
 
 const TIPOS = ['Tarjeta de crédito', 'Préstamo', 'Almacén / Alkosto', 'Persona', 'Servicio', 'Otro'];
 const CAMPOS = { nombre: 'Nombre', acreedor: 'Acreedor', tipo: 'Tipo', montoOriginal: 'Monto original', saldo: 'Saldo', tasa: 'Tasa anual', cuota: 'Cuota', dia: 'Día de pago' };
@@ -123,6 +124,7 @@ export function detalle(ctx, c, id) {
   const hist = [...(d.historial || [])].sort((a, b) => b.f - a.f);
   const itemHist = (h) => {
     if (h.tipo === 'creada') return `<div class="hist"><div><b>Deuda creada</b></div><span class="hist-f">${fechaCorta(h.f)}</span></div>`;
+    if (h.tipo === 'compra') return `<div class="hist"><div><b class="rosa">Compra +${pesos(h.monto)}</b><div class="hist-n">${esc(h.comercio || '')}</div></div><span class="hist-f">${fechaCorta(desdeISO(h.fecha))}</span></div>`;
     if (h.tipo === 'abono') {
       return `<div class="hist"><div><b class="menta">Abono ${pesos(h.monto)}</b>${h.nota ? `<div class="hist-n">${esc(h.nota)}</div>` : ''}
         <button class="enlace" data-deshacer="${esc(h.id)}">Deshacer</button></div><span class="hist-f">${fechaCorta(desdeISO(h.fecha))}</span></div>`;
@@ -133,7 +135,7 @@ export function detalle(ctx, c, id) {
   c.innerHTML = `
     <div class="encabezado"><button class="atras" id="atras">‹ Deudas</button><button class="btn-chico" id="editar">Editar</button></div>
     <h1>${esc(d.nombre)}</h1>
-    <p class="saludo">${esc([d.acreedor, d.tipo].filter(Boolean).join(' · '))}</p>
+    <p class="saludo">${esc([d.acreedor, d.tipo, d.tarjeta ? '•••• ' + d.tarjeta : ''].filter(Boolean).join(' · '))}</p>
     <div class="card">
       <div class="etiqueta">Saldo pendiente</div>
       <div class="cifra">${pesos(d.saldo)}</div>
@@ -237,6 +239,7 @@ export function formulario(ctx, c, id) {
         <label>Cuota mensual<input name="cuota" data-monto inputmode="numeric" value="${miles(v.cuota)}" placeholder="0" autocomplete="off"></label>
         <label>Día de pago<input name="dia" inputmode="numeric" maxlength="2" value="${v.dia || ''}" placeholder="1 a 31" autocomplete="off"></label>
       </div>
+      <label>Últimos 4 dígitos de la tarjeta (opcional)<input name="tarjeta" inputmode="numeric" maxlength="4" value="${esc(v.tarjeta || '')}" placeholder="Para sumar tus compras a esta deuda" autocomplete="off"></label>
       <label>Tasa de interés anual % (opcional)<input name="tasa" inputmode="decimal" value="${v.tasa || ''}" placeholder="Ej: 28,5" autocomplete="off"></label>
       <label>Notas (opcional)<textarea name="notas" rows="3" maxlength="300">${esc(v.notas)}</textarea></label>
       <div class="error" id="err"></div>
@@ -257,6 +260,10 @@ export function formulario(ctx, c, id) {
       montoOriginal, saldo, tasa: C.parseTasa(f.tasa.value), cuota: C.parseMonto(f.cuota.value), dia, notas: f.notas.value.trim()
     };
     if (f.espacio) nuevo.espacioId = f.espacio.value;
+    nuevo.tarjeta = V.soloDigitos(f.tarjeta.value);
+    if (f.tarjeta.value.trim() !== '' && nuevo.tarjeta.length !== 4) { err.textContent = 'La tarjeta son 4 dígitos.'; return; }
+    const tarjetaCambio = nuevo.tarjeta && nuevo.tarjeta !== (d ? d.tarjeta || '' : '');
+    if (tarjetaCambio) nuevo.tarjetaDesde = Date.now();
     if (!nuevo.nombre) { err.textContent = 'Escribe un nombre.'; return; }
     if (montoOriginal <= 0) { err.textContent = 'El monto original debe ser mayor a cero.'; return; }
     if (f.dia.value.trim() !== '' && (dia < 1 || dia > 31)) { err.textContent = 'El día de pago debe estar entre 1 y 31.'; return; }
@@ -272,6 +279,14 @@ export function formulario(ctx, c, id) {
       }
       if (d.dia !== nuevo.dia) d.planDesde = Date.now();
       Object.assign(d, nuevo);
+    }
+    if (tarjetaCambio) {
+      const dd = d || e.deudas[e.deudas.length - 1];
+      const pend = V.sinSumar(e, dd.tarjeta);
+      const suma = pend.reduce((t, k) => t + k.monto, 0);
+      if (pend.length && confirm(`Hay ${pend.length} ${pend.length === 1 ? 'compra' : 'compras'} con la tarjeta ${dd.tarjeta} (${pesos(suma)}) que aún no están en el saldo de esta deuda. ¿Sumarlas ahora? Si el saldo que escribiste ya las incluye, elige Cancelar.`)) {
+        pend.forEach((k) => V.aplicar(e, k, true));
+      }
     }
     await ctx.guardar();
     ctx.aviso(d ? 'Cambios guardados' : 'Deuda creada');

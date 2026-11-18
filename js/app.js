@@ -8,7 +8,7 @@ import * as deudasUI from './deudas-ui.js';
 import * as compromisosUI from './compromisos-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '1.0.0';
+const VERSION_APP = '1.1.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 

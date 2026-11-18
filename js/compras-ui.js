@@ -3,6 +3,10 @@ import { esc, pesos, miles, fechaCorta, desdeISO, modal, enlazarMonto } from './
 import * as L from './lector.js';
 import { aISO, parseMonto } from './calculos.js';
 import { analizar } from './capturas.js';
+import * as G from './graficas.js';
+import * as V from './vinculos.js';
+
+const COLOR_CAT = { Comida: '#ffb020', Supermercado: '#00d4a0', Transporte: '#3cc3d8', Servicios: '#8b5cf6', Salud: '#ff5a5f', Ropa: '#ff2d78', Entretenimiento: '#b79cff', Hogar: '#5b8def', 'Tecnología': '#9aa5b1', Otros: '#6b7480' };
 
 let borrador = null; // datos pre-llenados (por ejemplo desde un mensaje leído)
 
@@ -26,13 +30,28 @@ export function lista(ctx, c) {
     }
     grupos += `<button class="deuda" data-id="${esc(x.id)}">
       <div class="deuda-top"><span class="deuda-nombre">${esc(x.comercio)}</span><span class="deuda-monto">${pesos(x.monto)}</span></div>
-      <div class="deuda-sub">${esc(x.categoria)}${x.tarjeta ? ` · •••• ${esc(x.tarjeta)}` : x.tarjetaNombre ? ` · ${esc(x.tarjetaNombre)}` : ''}${x.revisar ? ' · <b class="ambar">Revisar</b>' : ''}</div></button>`;
+      <div class="deuda-sub">${esc(x.categoria)}${x.tarjeta ? ` · •••• ${esc(x.tarjeta)}` : x.tarjetaNombre ? ` · ${esc(x.tarjetaNombre)}` : ''}${x.aplicado ? ` · <span class="menta">suma a ${esc((e.deudas.find((d) => d.id === x.deudaId) || {}).nombre || 'tu tarjeta')}</span>` : ''}${x.revisar ? ' · <b class="ambar">Revisar</b>' : ''}</div></button>`;
+  }
+
+  let resumen = '';
+  if (delMes.length) {
+    const porCat = new Map();
+    const porTarjeta = new Map();
+    for (const x of delMes) {
+      porCat.set(x.categoria, (porCat.get(x.categoria) || 0) + x.monto);
+      const d = x.aplicado ? e.deudas.find((k) => k.id === x.deudaId) : null;
+      const nom = d ? d.nombre : x.tarjeta ? `•••• ${x.tarjeta}` : x.tarjetaNombre || 'Sin tarjeta';
+      porTarjeta.set(nom, (porTarjeta.get(nom) || 0) + x.monto);
+    }
+    resumen = G.dona([...porCat].map(([nombre, valor]) => ({ nombre, valor, color: COLOR_CAT[nombre] || '#9aa5b1' })), 'Este mes', pesos(totalMes))
+      + `<div class="card"><div class="etiqueta" style="margin-bottom:8px">Por tarjeta</div>${[...porTarjeta].sort((a, b) => b[1] - a[1]).map(([n, v]) => `<div class="ajuste"><span>${esc(n)}</span><b>${pesos(v)}</b></div>`).join('')}</div>`;
   }
 
   c.innerHTML = `
     <div class="encabezado"><h1>Compras</h1><button class="btn-chico" id="nueva">+ Nueva</button></div>
     <div class="card"><div class="etiqueta">Gastado este mes</div><div class="cifra">${pesos(totalMes)}</div>
       <div class="deuda-sub">${delMes.length} ${delMes.length === 1 ? 'compra' : 'compras'}</div></div>
+    ${resumen}
     <button class="btn sec" id="pegar" style="max-width:none;margin-top:0">Leer un mensaje del banco</button>
     <button class="btn sec" id="importar" style="max-width:none">Importar del atajo</button>
     <button class="enlace" id="guia" style="margin:0 auto 6px">Cómo configurar la captura automática</button>
@@ -127,6 +146,7 @@ export function formulario(ctx, c, id) {
         <label>Fecha<input name="fecha" type="date" value="${esc(v.fecha)}" max="${hoy}" required></label>
         <label>Tarjeta (4 dígitos)<input name="tarjeta" inputmode="numeric" maxlength="4" value="${esc(v.tarjeta)}" placeholder="Opcional" autocomplete="off"></label>
       </div>
+      <p class="nota" id="vinc" style="margin:-4px 0 14px"></p>
       <label>Categoría<select name="categoria">${L.CATEGORIAS.map((k) => `<option${k === v.categoria ? ' selected' : ''}>${k}</option>`).join('')}</select></label>
       <label>Nota (opcional)<input name="nota" maxlength="80" value="${esc(v.nota)}" autocomplete="off"></label>
       <div class="error" id="err"></div>
@@ -134,12 +154,23 @@ export function formulario(ctx, c, id) {
       ${x ? '<button class="btn peligro" type="button" id="eliminar" style="max-width:none">Eliminar compra</button>' : ''}
     </form>`;
   enlazarMonto(c);
+  const pintarVinculo = () => {
+    const f = c.querySelector('#f').elements;
+    const d = V.deudaDeTarjeta(e, V.soloDigitos(f.tarjeta.value));
+    const el = c.querySelector('#vinc');
+    if (x && x.aplicado) el.innerHTML = d ? `Suma al saldo de <b>${esc(d.nombre)}</b>. Si cambias el monto, el saldo se ajusta.` : 'Esta compra se quitará del saldo de su deuda al guardar.';
+    else if (d && (!x || (x.creada || 0) >= (d.tarjetaDesde || 0))) el.innerHTML = `Se sumará al saldo de <b>${esc(d.nombre)}</b>.`;
+    else el.textContent = '';
+  };
+  c.querySelector('#f').elements.tarjeta.addEventListener('input', pintarVinculo);
+  pintarVinculo();
   c.querySelector('#atras').onclick = () => { borrador = null; ctx.ir('compras', null); };
 
   c.querySelector('#f').onsubmit = async (ev) => {
     ev.preventDefault();
     const f = ev.target.elements;
     const err = c.querySelector('#err');
+    let vinculada = '';
     const nueva = {
       comercio: f.comercio.value.trim(), monto: parseMonto(f.monto.value), fecha: f.fecha.value || hoy,
       tarjeta: f.tarjeta.value.replace(/\D/g, '').slice(0, 4), categoria: f.categoria.value, nota: f.nota.value.trim()
@@ -149,20 +180,25 @@ export function formulario(ctx, c, id) {
     if (!x) {
       const repetida = e.compras.some((k) => huella(k) === huella(nueva));
       if (repetida && !confirm('Ya registraste una compra igual (misma fecha, monto y comercio). ¿Guardarla de todos modos?')) return;
-      e.compras.push({ id: crypto.randomUUID(), ...nueva, origen: leido ? 'texto' : 'manual', creada: Date.now() });
+      const nueva2 = { id: crypto.randomUUID(), ...nueva, origen: leido ? 'texto' : 'manual', creada: Date.now() };
+      e.compras.push(nueva2);
+      const dv = V.aplicar(e, nueva2);
+      if (dv) vinculada = dv.nombre;
     } else {
       Object.assign(x, nueva, { revisar: false });
+      V.sincronizar(e, x);
     }
     e.aprendido.comercios[L.normalizar(nueva.comercio)] = nueva.categoria;
     await ctx.guardar();
     borrador = null;
-    ctx.aviso(x ? 'Cambios guardados' : 'Compra guardada');
+    ctx.aviso(vinculada ? `Compra guardada y sumada a ${vinculada}` : x ? 'Cambios guardados' : 'Compra guardada');
     ctx.ir('compras', null);
   };
 
   const del = c.querySelector('#eliminar');
   if (del) del.onclick = async () => {
     if (!confirm(`¿Eliminar la compra en "${x.comercio}"? Esto no se puede deshacer.`)) return;
+    V.revertir(e, x);
     e.compras = e.compras.filter((k) => k.id !== x.id);
     await ctx.guardar();
     ctx.aviso('Compra eliminada');
@@ -211,12 +247,17 @@ function modalResumen(ctx, r) {
   const ok = m.el.querySelector('#ok');
   if (ok) ok.onclick = async () => {
     const ahora = Date.now();
-    r.nuevas.forEach((c, i) => e.compras.push({ id: crypto.randomUUID(), ...c, nota: '', creada: ahora + i }));
+    let vinculadas = 0;
+    r.nuevas.forEach((c, i) => {
+      const k = { id: crypto.randomUUID(), ...c, nota: '', creada: ahora + i };
+      e.compras.push(k);
+      if (V.aplicar(e, k)) vinculadas++;
+    });
     r.ilegibles.forEach((t) => { e.sinEntender = [{ id: crypto.randomUUID(), f: ahora, texto: t.slice(0, 600) }, ...(e.sinEntender || [])].slice(0, 30); });
     e.capturasVistas = [...(e.capturasVistas || []), ...r.hashes].slice(-3000);
     await ctx.guardar();
     m.cerrar();
-    ctx.aviso(hay ? `${r.nuevas.length} compras guardadas` : 'Listo');
+    ctx.aviso(hay ? `${r.nuevas.length} compras guardadas${vinculadas ? ` (${vinculadas} sumadas a tus tarjetas)` : ''}` : 'Listo');
     ctx.ir('compras', null);
   };
 }
