@@ -14,9 +14,10 @@ export const estadoInicial = () => ({
   capturasVistas: [],
   aprendido: { comercios: {} },
   compromisos: [],
+  cuentas: [],
   categorias: categoriasBase(),
   espacios: espaciosBase(),
-  ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 }, espacioActivo: 'personal', categoriasV2: true }
+  ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 }, espacioActivo: 'personal', categoriasV2: true, cuentaPrincipal: null }
 });
 
 const NOMBRE_A_ID = { Comida: 'alimentacion', Supermercado: 'alimentacion', Transporte: 'transporte', Servicios: 'servicios', Salud: 'salud', Ropa: 'ropa', Entretenimiento: 'ocio', Hogar: 'hogar', 'Tecnología': 'tecnologia', Otros: 'otros' };
@@ -34,6 +35,8 @@ export function migrar(estado) {
   e.aprendido = { comercios: {}, ...(e.aprendido || {}) };
   e.ajustes = { ...base.ajustes, ...(estado.ajustes || {}) };
   e.ajustes.recordatorio = { ...base.ajustes.recordatorio, ...(e.ajustes.recordatorio || {}) };
+  e.cuentas = Array.isArray(e.cuentas) ? e.cuentas : [];
+  if (!e.cuentas.some((c) => c.id === e.ajustes.cuentaPrincipal)) e.ajustes.cuentaPrincipal = null;
   e.compromisos = Array.isArray(e.compromisos) ? e.compromisos : [];
   e.compromisos.forEach((c) => { if (!c.cumplidos || typeof c.cumplidos !== 'object') c.cumplidos = {}; });
   if (!Array.isArray(e.categorias) || e.categorias.length === 0) e.categorias = categoriasBase();

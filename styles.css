@@ -365,3 +365,13 @@ nav button[data-tab] { min-width: 0; }
 .res-txt b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .res-txt small { color: var(--suave); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .res-monto { flex: none; font-size: 14px; }
+
+/* ---------- Tu dinero ---------- */
+.dinero-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; margin-bottom: 12px; background: var(--card); border: 1px solid var(--borde); border-radius: var(--radio); }
+.dinero-card.vacia { color: var(--suave); font-size: 14px; line-height: 1.4; justify-content: space-between; }
+.dinero-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dinero-col b { font-size: clamp(14px, 4.6vw, 18px); white-space: nowrap; }
+.dinero-col b.rosa { color: var(--rosa); }
+.cuenta-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 0; text-align: left; border-bottom: 1px solid var(--borde); }
+.cuenta-saldo { flex: none; font-weight: 700; font-size: clamp(14px, 4.4vw, 17px); white-space: nowrap; }
+.cifra.neg { color: var(--rosa); }

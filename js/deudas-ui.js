@@ -3,6 +3,8 @@
 import { esc, pesos, miles, fechaCorta, mesAnio, desdeISO, modal, enlazarMonto } from './util.js';
 import * as C from './calculos.js';
 import * as V from './vinculos.js';
+import * as Q from './cuentas.js';
+import { opcionesCuenta } from './cuentas-ui.js';
 
 const TIPOS = ['Tarjeta de crédito', 'Préstamo', 'Almacén / Alkosto', 'Persona', 'Servicio', 'Otro'];
 const CAMPOS = { nombre: 'Nombre', acreedor: 'Acreedor', tipo: 'Tipo', montoOriginal: 'Monto original', saldo: 'Saldo', tasa: 'Tasa anual', cuota: 'Cuota', dia: 'Día de pago' };
@@ -165,6 +167,8 @@ export function detalle(ctx, c, id) {
       const h = d.historial.find((x) => x.id === b.dataset.deshacer);
       if (!h || !confirm(`¿Deshacer el abono de ${pesos(h.monto)}? El saldo vuelve a subir.`)) return;
       d.saldo += h.monto;
+      const pg = e.pagos.find((x) => x.id === h.pagoId);
+      if (pg && pg.cuentaId) { const cu = (e.cuentas || []).find((k) => k.id === pg.cuentaId); if (cu) cu.saldo += pg.monto; }
       d.historial = d.historial.filter((x) => x.id !== h.id);
       e.pagos = e.pagos.filter((x) => x.id !== h.pagoId);
       await ctx.guardar();
@@ -196,6 +200,7 @@ export function modalAbono(ctx, d, { sugerido: sug, despues } = {}) {
     <form id="fa">
       <label>Monto<input name="monto" data-monto inputmode="numeric" autocomplete="off" value="${miles(sugerido)}" required></label>
       <label>Fecha<input name="fecha" type="date" value="${hoy}" max="${hoy}" required></label>
+      ${Q.gastables(ctx.sesion().estado).length ? `<label>Pagar desde<select name="cuenta">${opcionesCuenta(ctx.sesion().estado)}</select></label>` : ''}
       <label>Nota (opcional)<input name="nota" maxlength="80" autocomplete="off"></label>
       <div class="error" id="err"></div>
       <button class="btn" type="submit" style="max-width:none">Guardar abono</button>
@@ -213,7 +218,9 @@ export function modalAbono(ctx, d, { sugerido: sug, despues } = {}) {
     const fecha = f.fecha.value || hoy;
     const pagoId = crypto.randomUUID();
     const e = ctx.sesion().estado;
-    e.pagos.push({ id: pagoId, deudaId: d.id, monto, fecha, nota: f.nota.value.trim() });
+    const cu = Q.cuentaDePago(e, f.cuenta ? f.cuenta.value : 'auto', fecha);
+    e.pagos.push({ id: pagoId, deudaId: d.id, monto, fecha, nota: f.nota.value.trim(), cuentaId: cu ? cu.id : '' });
+    if (cu) cu.saldo -= monto;
     d.saldo -= monto;
     d.historial.push({ id: crypto.randomUUID(), f: Date.now(), tipo: 'abono', monto, fecha, nota: f.nota.value.trim(), pagoId });
     await ctx.guardar();

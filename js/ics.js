@@ -77,6 +77,18 @@ export function pagosICS(estado, { diasAntes = 1, hora = 9 } = {}, hoy = new Dat
       ]);
     }
   }
+  // Vencimiento de CDT: aviso 3 días antes y el mismo día.
+  for (const c of estado.cuentas || []) {
+    if (c.tipo !== 'cdt' || !c.vence) continue;
+    const [yy, mm, dd] = c.vence.split('-').map(Number);
+    const f = new Date(yy, mm - 1, dd);
+    if (f < h0) continue;
+    eventos.push([
+      'BEGIN:VEVENT', `UID:saldar-cdt-${c.id}@saldar`, `DTSTAMP:${ahora}`, `DTSTART:${stamp(f, hora)}`, 'DURATION:PT30M',
+      `SUMMARY:${esc('Vence CDT ' + c.nombre)}`, `DESCRIPTION:${esc(`Monto ${plata(c.saldo)}${c.tasa ? ' · ' + c.tasa + '% E.A.' : ''}`)}`, 'TRANSP:TRANSPARENT',
+      ...alarma(`En 3 días vence tu CDT ${c.nombre}`, '-P3D'), ...alarma(`Hoy vence tu CDT ${c.nombre}`, 'PT0S'), 'END:VEVENT'
+    ]);
+  }
   return { texto: envolver(eventos), cantidad: eventos.length };
 }
 

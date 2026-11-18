@@ -5,6 +5,8 @@ import * as K from './compromisos.js';
 import * as G from './graficas.js';
 import { entender, EJEMPLOS } from './asistente.js';
 import { buscar } from './busqueda.js';
+import * as Q from './cuentas.js';
+import { opcionesCuenta } from './cuentas-ui.js';
 import * as deudasUI from './deudas-ui.js';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -137,6 +139,11 @@ export function hoy(ctx, c) {
   const vencidas = sit.filter((x) => x.pendiente > 0 && x.vencida).length;
   const respaldoViejo = e.deudas.length + e.compromisos.length > 0 && (!e.ajustes.ultimoRespaldo || Date.now() - e.ajustes.ultimoRespaldo > 7 * 86400000);
   const totalDeuda = e.deudas.reduce((t, d) => t + (d.saldo || 0), 0);
+  const cdtAvisos = Q.cdtPorVencer(e, 15, ahora);
+  const pat = Q.patrimonio(e);
+  const dinero = (e.cuentas || []).length
+    ? `<button class="dinero-card" id="dinero"><span class="dinero-col"><span class="etiqueta">Tienes disponible</span><b>${pesos(Q.disponible(e))}</b></span><span class="dinero-col"><span class="etiqueta">Patrimonio neto</span><b class="${pat < 0 ? 'rosa' : ''}">${pesos(pat)}</b></span><span class="flecha-txt">›</span></button>`
+    : '<button class="dinero-card vacia" id="dinero"><span>💰 Registra lo que tienes (sueldo, ahorros, CDT) y Saldar descuenta tus pagos.</span><span class="flecha-txt">›</span></button>';
 
   c.innerHTML = `
     <div class="encabezado">
@@ -152,6 +159,8 @@ export function hoy(ctx, c) {
       <div><span class="etiqueta">${izq[0]}</span><b class="${izq[2]}">${pesos(izq[1])}</b></div>
       <div><span class="etiqueta">${der[0]}</span><b class="${der[2]}">${pesos(der[1])}</b></div>
     </div>
+    ${dinero}
+    ${cdtAvisos.map((x) => { const dd = Q.diasParaVencer(x, ahora); return `<div class="alerta">Tu CDT “${esc(x.nombre)}” ${dd < 0 ? 'ya venció' : dd === 0 ? 'vence hoy' : `vence en ${dd} ${dd === 1 ? 'día' : 'días'}`}.</div>`; }).join('')}
     ${vencidas ? `<div class="alerta">Tienes ${vencidas} ${vencidas === 1 ? 'pago de deuda vencido' : 'pagos de deudas vencidos'}.</div>` : ''}
     ${respaldoViejo ? `<button class="alerta info" id="resp">${e.ajustes.ultimoRespaldo ? `Hace ${Math.floor((Date.now() - e.ajustes.ultimoRespaldo) / 86400000)} días que no haces un respaldo.` : 'Aún no has hecho un respaldo.'} Toca aquí para guardarlo ahora.</button>` : ''}
     ${cuerpo}
@@ -175,6 +184,7 @@ export function hoy(ctx, c) {
   c.querySelector('#espacio').onclick = () => modalEspacios(ctx, () => hoy(ctx, c));
   c.querySelector('#perfil').onclick = () => ctx.ir('ajustes', null);
   c.querySelector('#buscar').onclick = () => buscar(ctx);
+  c.querySelector('#dinero').onclick = () => ctx.ir('inicio', { vista: 'cuentas' });
   const resp = c.querySelector('#resp');
   if (resp) resp.onclick = () => ctx.respaldar();
   const vd = c.querySelector('#verdeudas');
@@ -194,9 +204,7 @@ export function hoy(ctx, c) {
     b.onclick = async () => {
       const comp = e.compromisos.find((x) => x.id === b.dataset.id);
       if (!comp) return;
-      comp.cumplidos = comp.cumplidos || {};
-      if (comp.cumplidos[b.dataset.iso]) delete comp.cumplidos[b.dataset.iso];
-      else comp.cumplidos[b.dataset.iso] = Date.now();
+      Q.alternarCumplido(e, comp, b.dataset.iso);
       try { await ctx.guardar(); } catch { return; }
       hoy(ctx, c);
     };
@@ -227,8 +235,7 @@ function modalCelda(ctx, fila, mes, refrescar) {
       const comp = e.compromisos.find((x) => x.id === fila.c.id);
       const o = items[Number(b.dataset.i)];
       if (!comp || !o) return;
-      comp.cumplidos = comp.cumplidos || {};
-      if (comp.cumplidos[o.iso]) delete comp.cumplidos[o.iso]; else comp.cumplidos[o.iso] = Date.now();
+      Q.alternarCumplido(e, comp, o.iso);
       try { await ctx.guardar(); } catch { return; }
       m.cerrar();
       refrescar();
@@ -294,6 +301,7 @@ export function menuAgregar(ctx, abrirMensaje) {
     <h2>¿Qué quieres agregar?</h2>
     <button class="opcion-add" data-a="asis"><span class="ico" style="background:#8b5cf62e">✨</span><span><b>Asistente</b><small>Escribe una frase y la convierto en compromiso</small></span></button>
     <button class="opcion-add" data-a="comp"><span class="ico" style="background:#00d4a02e">🔁</span><span><b>Compromiso</b><small>Un gasto o ingreso que se repite</small></span></button>
+    <button class="opcion-add" data-a="cuenta"><span class="ico" style="background:#00d4a02e">💰</span><span><b>Cuenta</b><small>Efectivo, ahorros o CDT</small></span></button>
     <button class="opcion-add" data-a="deuda"><span class="ico" style="background:#ff2d782e">💳</span><span><b>Deuda</b><small>Tarjeta, préstamo o cuenta por pagar</small></span></button>
     <button class="opcion-add" data-a="compra"><span class="ico" style="background:#8b5cf62e">🛒</span><span><b>Compra</b><small>Anotar un gasto que ya hiciste</small></span></button>
     <button class="opcion-add" data-a="msg"><span class="ico" style="background:#ffb0202e">✉️</span><span><b>Mensaje del banco</b><small>Pegar un SMS o correo y leerlo</small></span></button>
@@ -305,6 +313,7 @@ export function menuAgregar(ctx, abrirMensaje) {
       const a = b.dataset.a;
       if (a === 'asis') asistente(ctx);
       else if (a === 'comp') ctx.ir('inicio', { vista: 'compromiso' });
+      else if (a === 'cuenta') ctx.ir('inicio', { vista: 'cuenta' });
       else if (a === 'deuda') ctx.ir('deudas', { vista: 'form' });
       else if (a === 'compra') ctx.ir('compras', { vista: 'compra' });
       else abrirMensaje();
@@ -360,6 +369,7 @@ export function formulario(ctx, c, id, borrador) {
       <div class="card">
         <label>Aviso anticipado<select name="aviso">${K.AVISOS.map(([k, t]) => `<option value="${k === null ? 'n' : k}"${(k === null ? 'n' : String(k)) === aviso ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
         <p class="nota" style="margin:-6px 0 14px">Se usa al tocar “Agregar pagos al Calendario” en la pestaña Calendario.</p>
+        ${Q.gastables(e).length ? `<label>Cuenta (de dónde sale o a dónde entra)<select name="cuenta">${opcionesCuenta(e, v.cuentaId)}</select></label>` : ''}
         ${e.espacios.length > 1 ? `<label>Espacio<select name="espacio">${e.espacios.map((x) => `<option value="${esc(x.id)}"${x.id === v.espacioId ? ' selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>` : ''}
         <label style="margin-bottom:0">Nota (opcional)<textarea name="nota" rows="2" maxlength="200">${esc(v.nota || '')}</textarea></label>
       </div>
@@ -416,7 +426,8 @@ export function formulario(ctx, c, id, borrador) {
       frecuencia: s.frecuencia, inicio: f.inicio.value,
       fin: s.frecuencia !== 'unico' && f.finModo.value === 'f' ? (f.fin.value || null) : null,
       avisoDias: f.aviso.value === 'n' ? null : Number(f.aviso.value),
-      espacioId: f.espacio ? f.espacio.value : v.espacioId, nota: f.nota.value.trim()
+      espacioId: f.espacio ? f.espacio.value : v.espacioId, nota: f.nota.value.trim(),
+      cuentaId: f.cuenta ? f.cuenta.value : (v.cuentaId === undefined ? 'auto' : v.cuentaId)
     };
     if (!nuevo.nombre) { err.textContent = 'Escribe un nombre.'; return; }
     if (nuevo.monto <= 0) { err.textContent = 'El monto debe ser mayor a cero.'; return; }

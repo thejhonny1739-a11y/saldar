@@ -122,3 +122,56 @@ test('estado inicial: categorías base incluyen las fijas', () => {
   const ids = estadoInicial().categorias.map((k) => k.id);
   assert.ok(ids.includes('otros') && ids.includes('otros-ing'));
 });
+
+/* ---------- Cuentas ---------- */
+import * as Q from '../js/cuentas.js';
+
+const conCuenta = (desde = '2026-11-01') => {
+  const e = estado();
+  const c = { id: 'k1', nombre: 'Banco', tipo: 'cuenta', saldo: 1000, desde };
+  e.cuentas.push(c);
+  e.ajustes.cuentaPrincipal = 'k1';
+  return { e, c };
+};
+
+test('cuentas: disponible y patrimonio (CDT cuenta como patrimonio, no como disponible)', () => {
+  const { e } = conCuenta();
+  e.cuentas.push({ id: 'k2', nombre: 'CDT', tipo: 'cdt', saldo: 5000, desde: '2026-01-01' });
+  e.deudas.push({ id: 'd', nombre: 'Visa', saldo: 800 });
+  assert.equal(Q.disponible(e), 1000);
+  assert.equal(Q.patrimonio(e), 1000 + 5000 - 800);
+});
+test('cuentas: marcar un gasto descuenta y desmarcar devuelve', () => {
+  const { e, c } = conCuenta();
+  const comp = { id: 'x', tipo: 'gasto', monto: 300, cumplidos: {} };
+  assert.equal(Q.alternarCumplido(e, comp, '2026-11-20'), true);
+  assert.equal(c.saldo, 700);
+  assert.equal(Q.alternarCumplido(e, comp, '2026-11-20'), false);
+  assert.equal(c.saldo, 1000);
+});
+test('cuentas: un ingreso recibido suma', () => {
+  const { e, c } = conCuenta();
+  Q.alternarCumplido(e, { id: 'x', tipo: 'ingreso', monto: 500, cumplidos: {} }, '2026-11-20');
+  assert.equal(c.saldo, 1500);
+});
+test('cuentas: no se mueve dinero de fechas anteriores al saldo inicial ni con "No mover dinero"', () => {
+  const { e, c } = conCuenta('2026-11-10');
+  Q.alternarCumplido(e, { id: 'a', tipo: 'gasto', monto: 300, cumplidos: {} }, '2026-11-05');
+  assert.equal(c.saldo, 1000);
+  Q.alternarCumplido(e, { id: 'b', tipo: 'gasto', monto: 300, cumplidos: {}, cuentaId: '' }, '2026-11-20');
+  assert.equal(c.saldo, 1000);
+});
+test('cuentas: se puede elegir otra cuenta distinta de la principal', () => {
+  const { e, c } = conCuenta();
+  const otra = { id: 'k3', nombre: 'Efectivo', tipo: 'efectivo', saldo: 200, desde: '2026-11-01' };
+  e.cuentas.push(otra);
+  Q.alternarCumplido(e, { id: 'x', tipo: 'gasto', monto: 50, cumplidos: {}, cuentaId: 'k3' }, '2026-11-20');
+  assert.equal(otra.saldo, 150);
+  assert.equal(c.saldo, 1000);
+});
+test('cuentas: CDT por vencer', () => {
+  const e = estado();
+  e.cuentas.push({ id: 'k', nombre: 'CDT', tipo: 'cdt', saldo: 1, vence: '2026-12-01' });
+  assert.equal(Q.cdtPorVencer(e, 15, new Date(2026, 10, 20)).length, 1);
+  assert.equal(Q.cdtPorVencer(e, 5, new Date(2026, 10, 20)).length, 0);
+});
