@@ -4,7 +4,7 @@ import { esc, fechaLarga } from './util.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.3.2';
+const VERSION_APP = '0.3.3';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -321,10 +321,11 @@ function enlazarAjustes() {
   document.body.appendChild(sonda);
   const cs = getComputedStyle(sonda);
   const barra = document.querySelector('nav').getBoundingClientRect();
+  const vh = (u) => { const t = document.createElement('div'); t.style.cssText = `position:fixed;visibility:hidden;height:${u}`; document.body.appendChild(t); const h = Math.round(t.getBoundingClientRect().height); t.remove(); return h; };
   const vv = window.visualViewport;
   document.getElementById('diag').innerHTML =
     `pantalla ${screen.width}×${screen.height}<br>ventana ${innerWidth}×${innerHeight}<br>visual ${Math.round(vv?.width || 0)}×${Math.round(vv?.height || 0)}<br>` +
-    `seguro arriba ${cs.paddingTop} abajo ${cs.paddingBottom}<br>fin barra ${Math.round(barra.bottom)} · alto app ${Math.round(app.getBoundingClientRect().height)} · modo ${navigator.standalone ? 'app' : 'safari'}`;
+    `seguro arriba ${cs.paddingTop} abajo ${cs.paddingBottom}<br>fin barra ${Math.round(barra.bottom)} · falta ${getComputedStyle(document.documentElement).getPropertyValue('--falta')} · 100vh ${vh('100vh')} · 100lvh ${vh('100lvh')} · 100dvh ${vh('100dvh')} · scrollY ${Math.round(scrollY)} · vv.top ${Math.round(vv?.offsetTop || 0)} · modo ${navigator.standalone ? 'app' : 'safari'}`;
   sonda.remove();
   navigator.storage?.persisted?.().then((p) => { const el = document.getElementById('persist'); if (el) el.textContent = p ? 'Sí' : 'No'; });
   document.getElementById('respaldar').onclick = exportarRespaldo;
@@ -346,20 +347,16 @@ function bloquear() {
   pantallaPerfiles();
 }
 
-// En el iPhone instalado, la ventana (innerHeight) mide menos que la pantalla: le falta la zona de la hora.
-// La app se dibuja bajo esa zona, así que se usa el alto real de la pantalla para que la barra llegue al borde.
-function ajustarAlto() {
-  const raiz = document.documentElement;
+// En el iPhone instalado, la ventana de la app mide menos que la pantalla (le faltan ~47 px abajo).
+// Esa franja no se puede dibujar: se pinta del color de la barra y se descuenta del relleno inferior.
+function ajustarFalta() {
   const falta = screen.height - innerHeight;
-  if (navigator.standalone && innerHeight > innerWidth && falta > 0 && falta <= 70) {
-    raiz.style.setProperty('--alto', `${screen.height}px`);
-  } else {
-    raiz.style.removeProperty('--alto');
-  }
+  const hay = navigator.standalone && innerHeight > innerWidth && falta > 0 && falta <= 70;
+  document.documentElement.style.setProperty('--falta', hay ? `${falta}px` : '0px');
 }
-ajustarAlto();
-addEventListener('resize', ajustarAlto);
-addEventListener('orientationchange', () => setTimeout(ajustarAlto, 300));
+ajustarFalta();
+addEventListener('resize', ajustarFalta);
+addEventListener('orientationchange', () => setTimeout(ajustarFalta, 300));
 
 // Bloqueo automático al dejar la app en segundo plano.
 document.addEventListener('visibilitychange', () => {

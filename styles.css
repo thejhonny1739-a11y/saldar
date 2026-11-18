@@ -11,11 +11,13 @@
   --grad: linear-gradient(90deg, #8b5cf6, #ff2d78);
   --radio: 16px;
   --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --falta: 0px; /* lo que iOS le quita a la ventana de la app; lo calcula app.js */
+  --safe-bottom: max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--falta)));
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--texto); }
+html { margin: 0; height: 100%; overflow: hidden; background: var(--card); }
+body { margin: 0; position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: var(--card); color: var(--texto); }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -26,7 +28,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 input { font: inherit; color: inherit; user-select: text; -webkit-user-select: text; }
 
 /* Fijo a toda la pantalla: evita la franja oscura bajo la barra en el iPhone instalado */
-#app { position: fixed; top: 0; right: 0; left: 0; height: var(--alto, 100%); display: flex; flex-direction: column; background: var(--bg); }
+#app { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; background: var(--bg); }
 
 /* ---------- Pantallas de acceso ---------- */
 .acceso {
@@ -88,7 +90,7 @@ input { font: inherit; color: inherit; user-select: text; -webkit-user-select: t
 
 /* ---------- App principal ---------- */
 .contenido {
-  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   padding: calc(var(--safe-top) + 20px) 18px 24px;
 }
 .contenido h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -.5px; }
@@ -112,7 +114,7 @@ input { font: inherit; color: inherit; user-select: text; -webkit-user-select: t
 
 /* Barra inferior */
 nav {
-  display: flex; background: rgba(28, 32, 37, .96); border-top: 1px solid var(--borde);
+  display: flex; background: var(--card); border-top: 1px solid var(--borde);
   padding: 8px 6px calc(var(--safe-bottom) + 8px);
 }
 nav button {
@@ -165,7 +167,7 @@ nav button.activo { color: var(--menta); }
 .dos label { flex: 1; min-width: 0; }
 .error { color: var(--rosa); min-height: 1.2em; margin-bottom: 8px; font-size: 14px; }
 
-.modal { position: fixed; top: 0; right: 0; left: 0; height: var(--alto, 100%); background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; z-index: 20; }
+.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; z-index: 20; }
 .modal-card { width: 100%; background: var(--bg); border-top: 1px solid var(--borde); border-radius: 20px 20px 0 0; padding: 20px 18px calc(var(--safe-bottom) + 18px); max-height: 90%; overflow-y: auto; }
 .modal-card h2 { margin: 0 0 16px; }
 
