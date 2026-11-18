@@ -1,5 +1,6 @@
 // Almacenamiento local (IndexedDB). Cada perfil guarda un solo bloque cifrado con su PIN.
 import { bytesAleatorios, derivarLlave, cifrar, descifrar } from './crypto.js';
+import { categoriasBase, espaciosBase } from './compromisos.js';
 
 const DB_NOMBRE = 'saldar';
 const DB_VERSION = 1;
@@ -12,7 +13,10 @@ export const estadoInicial = () => ({
   sinEntender: [],
   capturasVistas: [],
   aprendido: { comercios: {} },
-  ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 } }
+  compromisos: [],
+  categorias: categoriasBase(),
+  espacios: espaciosBase(),
+  ajustes: { moneda: 'COP', ultimoRespaldo: null, recordatorio: { diasAntes: 1, hora: 9 }, espacioActivo: 'personal' }
 });
 
 // Completa campos que falten en datos guardados por versiones anteriores.
@@ -28,6 +32,13 @@ export function migrar(estado) {
   e.aprendido = { comercios: {}, ...(e.aprendido || {}) };
   e.ajustes = { ...base.ajustes, ...(estado.ajustes || {}) };
   e.ajustes.recordatorio = { ...base.ajustes.recordatorio, ...(e.ajustes.recordatorio || {}) };
+  e.compromisos = Array.isArray(e.compromisos) ? e.compromisos : [];
+  e.compromisos.forEach((c) => { if (!c.cumplidos || typeof c.cumplidos !== 'object') c.cumplidos = {}; });
+  if (!Array.isArray(e.categorias) || e.categorias.length === 0) e.categorias = categoriasBase();
+  for (const k of categoriasBase()) if (['otros', 'otros-ing'].includes(k.id) && !e.categorias.some((x) => x.id === k.id)) e.categorias.push(k);
+  if (!Array.isArray(e.espacios) || e.espacios.length === 0) e.espacios = espaciosBase();
+  if (!e.espacios.some((x) => x.id === e.ajustes.espacioActivo)) e.ajustes.espacioActivo = e.espacios[0].id;
+  e.compromisos.forEach((c) => { if (!e.espacios.some((x) => x.id === c.espacioId)) c.espacioId = e.espacios[0].id; });
   e.deudas.forEach((d) => { if (!Array.isArray(d.historial)) d.historial = []; });
   return e;
 }

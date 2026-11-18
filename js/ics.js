@@ -1,5 +1,6 @@
 // Archivos de calendario (.ics) para que iOS lance los recordatorios aunque la app esté cerrada.
 import { ocurrencia } from './calculos.js';
+import { ocurrenciasMes } from './compromisos.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const stamp = (d, h = 9, mi = 0) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(h)}${pad(mi)}00`;
@@ -50,6 +51,30 @@ export function pagosICS(estado, { diasAntes = 1, hora = 9 } = {}, hoy = new Dat
         'END:VEVENT'
       ];
       eventos.push(ev);
+    }
+  }
+  // Compromisos recurrentes (todos los espacios) que tengan aviso. Se omiten los ya marcados como pagados y los pasados.
+  const h0 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  for (let i = 0; i < meses; i++) {
+    for (const o of ocurrenciasMes(estado, null, hoy.getFullYear(), hoy.getMonth() + i, hoy)) {
+      const c = o.c;
+      if (o.pagado || o.fecha < h0 || c.avisoDias === null || c.avisoDias === undefined) continue;
+      const f = o.fecha;
+      const ing = c.tipo === 'ingreso';
+      const avisoDias = c.avisoDias;
+      eventos.push([
+        'BEGIN:VEVENT',
+        `UID:saldar-c-${c.id}-${f.getFullYear()}${pad(f.getMonth() + 1)}${pad(f.getDate())}@saldar`,
+        `DTSTAMP:${ahora}`,
+        `DTSTART:${stamp(f, hora)}`,
+        'DURATION:PT30M',
+        `SUMMARY:${esc((ing ? 'Ingreso ' : 'Pago ') + c.nombre)}`,
+        `DESCRIPTION:${esc(`${ing ? 'Ingreso' : 'Pago'} de ${plata(o.monto)}${c.nota ? ' · ' + c.nota : ''}`)}`,
+        'TRANSP:TRANSPARENT',
+        ...(avisoDias > 0 ? alarma(`${avisoDias === 1 ? 'Mañana' : `En ${avisoDias} días`}: ${c.nombre} (${plata(o.monto)})`, `-P${avisoDias}D`) : []),
+        ...alarma(`Hoy: ${c.nombre} (${plata(o.monto)})`, 'PT0S'),
+        'END:VEVENT'
+      ]);
     }
   }
   return { texto: envolver(eventos), cantidad: eventos.length };

@@ -5,9 +5,10 @@ import * as comprasUI from './compras-ui.js';
 import * as calendarioUI from './calendario-ui.js';
 import { respaldoICS } from './ics.js';
 import * as deudasUI from './deudas-ui.js';
+import * as compromisosUI from './compromisos-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.6.0';
+const VERSION_APP = '0.7.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -31,6 +32,7 @@ function aviso(texto) {
 async function pantallaPerfiles() {
   sesion = null;
   calendarioUI.reiniciar();
+  compromisosUI.reiniciar();
   const perfiles = await store.listarPerfiles();
   if (perfiles.length === 0) return nuevoPerfil();
 
@@ -180,14 +182,16 @@ const ICONOS = {
   compras: '<path d="M6 6h15l-2 9H8L6 6zM6 6L5 3H2"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>',
   ajustes: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>'
 };
-const TITULOS = { inicio: 'Inicio', deudas: 'Deudas', calendario: 'Calendario', compras: 'Compras', ajustes: 'Ajustes' };
+const TITULOS = { inicio: 'Inicio', deudas: 'Pagos', calendario: 'Calendario', compras: 'Compras', ajustes: 'Ajustes' };
 
 const ctx = {
   sesion: () => sesion,
   guardar: async () => {
     try { await store.guardar(sesion); } catch { aviso('No se pudo guardar. Intenta de nuevo.'); throw new Error('guardar'); }
   },
-  ir(tab, subvista) { pestana = tab; sub = subvista || null; pantallaPrincipal(); },
+  ir(tab, subvista) {
+    if (tab === 'deudas' && subvista) compromisosUI.mostrar(subvista.vista === 'compromiso' ? 'compromisos' : 'deudas');
+    pestana = tab; sub = subvista || null; pantallaPrincipal(); },
   aviso
 };
 
@@ -199,6 +203,7 @@ function pantallaPrincipal() {
     if (sub.vista === 'detalle') deudasUI.detalle(ctx, cont, sub.id);
     else if (sub.vista === 'compra') comprasUI.formulario(ctx, cont, sub.id);
     else if (sub.vista === 'guia') comprasUI.guia(ctx, cont);
+    else if (sub.vista === 'compromiso') compromisosUI.formulario(ctx, cont, sub.id);
     else deudasUI.formulario(ctx, cont, sub.id);
     cont.scrollTop = 0;
     return;
@@ -216,7 +221,7 @@ function pantallaPrincipal() {
   });
   const c = document.getElementById('contenido');
   if (pestana === 'inicio') deudasUI.inicio(ctx, c);
-  else if (pestana === 'deudas') deudasUI.lista(ctx, c);
+  else if (pestana === 'deudas') compromisosUI.pagos(ctx, c);
   else if (pestana === 'calendario') calendarioUI.calendario(ctx, c);
   else if (pestana === 'compras') comprasUI.lista(ctx, c);
   else {

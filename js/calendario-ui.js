@@ -2,6 +2,7 @@
 import { esc, pesos, fechaCorta, entregarICS } from './util.js';
 import * as C from './calculos.js';
 import { pagosICS } from './ics.js';
+import * as K from './compromisos.js';
 
 const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -23,9 +24,12 @@ export function calendario(ctx, c) {
   const { y, m } = vista;
   const rec = e.ajustes.recordatorio;
 
-  const pagos = e.deudas
-    .map((d) => ({ d, o: C.ocurrencia(d, e, y, m, hoy) }))
-    .filter((x) => x.o)
+  const esp = K.espacioActivo(e);
+  const comps = K.ocurrenciasMes(e, esp.id, y, m, hoy).map((x) => ({
+    c: x.c,
+    o: { fecha: x.fecha, monto: x.monto, estado: x.pagado ? 'pagada' : x.estado === 'vencido' ? 'vencida' : 'pendiente' }
+  }));
+  const pagos = [...e.deudas.map((d) => ({ d, o: C.ocurrencia(d, e, y, m, hoy) })).filter((x) => x.o), ...comps]
     .sort((a, b) => a.o.fecha - b.o.fecha);
   const porDia = {};
   pagos.forEach((p) => { (porDia[p.o.fecha.getDate()] ||= []).push(p); });
@@ -45,7 +49,7 @@ export function calendario(ctx, c) {
   }
 
   const visibles = vista.dia ? (porDia[vista.dia] || []) : pagos;
-  const porPagar = pagos.filter((p) => p.o.estado === 'pendiente' || p.o.estado === 'vencida').reduce((t, p) => t + p.o.monto, 0);
+  const porPagar = pagos.filter((p) => !(p.c && p.c.tipo === 'ingreso') && (p.o.estado === 'pendiente' || p.o.estado === 'vencida')).reduce((t, p) => t + p.o.monto, 0);
 
   c.innerHTML = `
     <div class="encabezado"><h1>Calendario</h1><button class="btn-chico" id="hoy">Hoy</button></div>
@@ -59,11 +63,19 @@ export function calendario(ctx, c) {
       <div class="cuadricula">${celdas}</div>
       <div class="leyenda"><span class="ley"><i class="p-menta"></i>Pagada</span><span class="ley"><i class="p-ambar"></i>Por pagar</span><span class="ley"><i class="p-rosa"></i>Vencida</span><span class="ley"><i class="p-morado"></i>Programada</span></div>
     </div>
+    <p class="nota" style="margin:-4px 2px 0">Incluye tus deudas y los compromisos del espacio “${esc(esp.nombre)}”.</p>
     <div class="seccion">${vista.dia ? `Pagos del ${vista.dia} de ${MESES[m].toLowerCase()}` : `Pagos de ${MESES[m].toLowerCase()}`}${!vista.dia && porPagar ? ` · por pagar ${pesos(porPagar)}` : ''}</div>
     ${visibles.length === 0
       ? '<div class="card vacio">No hay pagos programados aquí.</div>'
-      : visibles.map(({ d, o }) => {
-          const t = ESTADO[o.estado];
+      : visibles.map(({ d, c: comp, o }) => {
+          const t = comp && comp.tipo === 'ingreso'
+            ? { texto: o.estado === 'pagada' ? 'Recibido' : 'Por recibir', clase: o.estado === 'pagada' ? 'menta' : 'morado' }
+            : ESTADO[o.estado];
+          if (comp) {
+            return `<button class="deuda" data-comp="${esc(comp.id)}">
+            <div class="deuda-top"><span class="deuda-nombre">${esc(comp.nombre)}</span><span class="deuda-monto"${comp.tipo === 'ingreso' ? ' style="color:var(--menta)"' : ''}>${comp.tipo === 'ingreso' ? '+' : ''}${pesos(o.monto)}</span></div>
+            <div class="deuda-pie ${t.clase}">${t.texto} · ${fechaCorta(o.fecha)}</div></button>`;
+          }
           return `<button class="deuda" data-id="${esc(d.id)}">
             <div class="deuda-top"><span class="deuda-nombre">${esc(d.nombre)}</span><span class="deuda-monto">${pesos(o.monto)}</span></div>
             <div class="deuda-pie ${t.clase}">${t.texto} · ${fechaCorta(o.fecha)}</div></button>`;
@@ -88,6 +100,7 @@ export function calendario(ctx, c) {
     b.onclick = () => { const n = Number(b.dataset.dia); vista.dia = vista.dia === n ? null : n; calendario(ctx, c); };
   });
   c.querySelectorAll('.deuda[data-id]').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'detalle', id: b.dataset.id }); });
+  c.querySelectorAll('.deuda[data-comp]').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'compromiso', id: b.dataset.comp }); });
 
   const guardarRec = async () => {
     e.ajustes.recordatorio = { diasAntes: Number(c.querySelector('#antes').value), hora: Number(c.querySelector('#hora').value) };
