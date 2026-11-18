@@ -4,7 +4,7 @@ import { esc, fechaLarga } from './util.js';
 import * as deudasUI from './deudas-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.3.1';
+const VERSION_APP = '0.3.2';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -324,7 +324,7 @@ function enlazarAjustes() {
   const vv = window.visualViewport;
   document.getElementById('diag').innerHTML =
     `pantalla ${screen.width}×${screen.height}<br>ventana ${innerWidth}×${innerHeight}<br>visual ${Math.round(vv?.width || 0)}×${Math.round(vv?.height || 0)}<br>` +
-    `seguro arriba ${cs.paddingTop} abajo ${cs.paddingBottom}<br>fin barra ${Math.round(barra.bottom)} · modo ${navigator.standalone ? 'app' : 'safari'}`;
+    `seguro arriba ${cs.paddingTop} abajo ${cs.paddingBottom}<br>fin barra ${Math.round(barra.bottom)} · alto app ${Math.round(app.getBoundingClientRect().height)} · modo ${navigator.standalone ? 'app' : 'safari'}`;
   sonda.remove();
   navigator.storage?.persisted?.().then((p) => { const el = document.getElementById('persist'); if (el) el.textContent = p ? 'Sí' : 'No'; });
   document.getElementById('respaldar').onclick = exportarRespaldo;
@@ -345,6 +345,21 @@ function bloquear() {
   sesion = null; // al soltar la sesión se pierde la llave de la memoria
   pantallaPerfiles();
 }
+
+// En el iPhone instalado, la ventana (innerHeight) mide menos que la pantalla: le falta la zona de la hora.
+// La app se dibuja bajo esa zona, así que se usa el alto real de la pantalla para que la barra llegue al borde.
+function ajustarAlto() {
+  const raiz = document.documentElement;
+  const falta = screen.height - innerHeight;
+  if (navigator.standalone && innerHeight > innerWidth && falta > 0 && falta <= 70) {
+    raiz.style.setProperty('--alto', `${screen.height}px`);
+  } else {
+    raiz.style.removeProperty('--alto');
+  }
+}
+ajustarAlto();
+addEventListener('resize', ajustarAlto);
+addEventListener('orientationchange', () => setTimeout(ajustarAlto, 300));
 
 // Bloqueo automático al dejar la app en segundo plano.
 document.addEventListener('visibilitychange', () => {

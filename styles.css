@@ -26,7 +26,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 input { font: inherit; color: inherit; user-select: text; -webkit-user-select: text; }
 
 /* Fijo a toda la pantalla: evita la franja oscura bajo la barra en el iPhone instalado */
-#app { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; background: var(--bg); }
+#app { position: fixed; top: 0; right: 0; left: 0; height: var(--alto, 100%); display: flex; flex-direction: column; background: var(--bg); }
 
 /* ---------- Pantallas de acceso ---------- */
 .acceso {
@@ -165,7 +165,7 @@ nav button.activo { color: var(--menta); }
 .dos label { flex: 1; min-width: 0; }
 .error { color: var(--rosa); min-height: 1.2em; margin-bottom: 8px; font-size: 14px; }
 
-.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; z-index: 20; }
+.modal { position: fixed; top: 0; right: 0; left: 0; height: var(--alto, 100%); background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; z-index: 20; }
 .modal-card { width: 100%; background: var(--bg); border-top: 1px solid var(--borde); border-radius: 20px 20px 0 0; padding: 20px 18px calc(var(--safe-bottom) + 18px); max-height: 90%; overflow-y: auto; }
 .modal-card h2 { margin: 0 0 16px; }
 
