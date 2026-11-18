@@ -3,6 +3,7 @@ import { esc, pesos, fechaCorta, miles, enlazarMonto, modal } from './util.js';
 import { parseMonto, aISO, situacion } from './calculos.js';
 import * as K from './compromisos.js';
 import * as G from './graficas.js';
+import { entender, EJEMPLOS } from './asistente.js';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MES3 = MESES.map((m) => m.slice(0, 3));
@@ -223,11 +224,63 @@ function modalCelda(ctx, fila, mes, refrescar) {
   });
 }
 
+/* ================= Asistente ================= */
+
+export function asistente(ctx) {
+  const s = ctx.sesion();
+  const e = s.estado;
+  const m = modal(`
+    <h2 class="asis-titulo">Hola ${esc(s.nombre)},<br>agrega tu próximo compromiso</h2>
+    <div class="card" style="padding:14px">
+      <div class="etiqueta" style="margin-bottom:8px;color:#8fa3d9">Puedes escribir, por ejemplo:</div>
+      <div id="ej">${EJEMPLOS.map((x) => `<button class="ejemplo" type="button">“${esc(x)}”</button>`).join('')}</div>
+    </div>
+    <textarea id="txt" class="asis-txt" rows="2" maxlength="200" placeholder="Escribe tu compromiso…" autocomplete="off"></textarea>
+    <p class="nota" style="margin-top:6px">Para dictar, toca el micrófono del teclado del iPhone.</p>
+    <div id="res"></div>
+    <button class="btn" id="ent" style="max-width:none">Entender</button>
+    <button class="volver" id="no" type="button" style="width:100%">Cancelar</button>`);
+  const txt = m.el.querySelector('#txt');
+  m.el.querySelector('#no').onclick = m.cerrar;
+  m.el.querySelectorAll('.ejemplo').forEach((b, i) => { b.onclick = () => { txt.value = EJEMPLOS[i]; hacer(); }; });
+
+  const hacer = () => {
+    const r = entender(txt.value, e, new Date());
+    const res = m.el.querySelector('#res');
+    if (!r.datos) { res.innerHTML = `<div class="alerta">${esc(r.avisos[0])}</div>`; return; }
+    const d = r.datos;
+    const cat = e.categorias.find((k) => k.id === d.categoriaId) || { nombre: 'Otros', icono: '📦', color: '#9aa5b1' };
+    res.innerHTML = `
+      <div class="card" style="margin-top:12px">
+        <div class="ajuste"><span>${d.tipo === 'ingreso' ? '↙ Ingreso' : '↗ Gasto'}</span><b>${esc(d.nombre)}</b></div>
+        <div class="ajuste"><span>Monto</span><b>${d.monto ? pesos(d.monto) : '—'}</b></div>
+        <div class="ajuste"><span>Categoría</span><b>${esc(cat.icono)} ${esc(cat.nombre)}</b></div>
+        <p class="nota" style="margin:10px 0 0">${esc(K.descripcion(d.frecuencia, d.inicio, null))}</p>
+      </div>
+      ${r.avisos.map((a) => `<div class="alerta" style="margin-bottom:8px">${esc(a)}</div>`).join('')}
+      ${r.ok ? '<button class="btn" id="crear" style="max-width:none;margin-top:4px">Crear compromiso</button>' : ''}
+      <button class="btn sec" id="ajustar" style="max-width:none">Ajustar antes de guardar</button>`;
+    const ajustar = res.querySelector('#ajustar');
+    ajustar.onclick = () => { m.cerrar(); ctx.ir('inicio', { vista: 'compromiso', borrador: d }); };
+    const crear = res.querySelector('#crear');
+    if (crear) crear.onclick = async () => {
+      e.compromisos.push({ id: crypto.randomUUID(), ...d, espacioId: K.espacioActivo(e).id, creada: Date.now(), cumplidos: {} });
+      try { await ctx.guardar(); } catch { return; }
+      m.cerrar();
+      ctx.aviso('Compromiso creado');
+      ctx.ir('inicio', null);
+    };
+    res.scrollIntoView({ block: 'nearest' });
+  };
+  m.el.querySelector('#ent').onclick = hacer;
+}
+
 /* ================= Botón + ================= */
 
 export function menuAgregar(ctx, abrirMensaje) {
   const m = modal(`
     <h2>¿Qué quieres agregar?</h2>
+    <button class="opcion-add" data-a="asis"><span class="ico" style="background:#8b5cf62e">✨</span><span><b>Asistente</b><small>Escribe una frase y la convierto en compromiso</small></span></button>
     <button class="opcion-add" data-a="comp"><span class="ico" style="background:#00d4a02e">🔁</span><span><b>Compromiso</b><small>Un gasto o ingreso que se repite</small></span></button>
     <button class="opcion-add" data-a="deuda"><span class="ico" style="background:#ff2d782e">💳</span><span><b>Deuda</b><small>Tarjeta, préstamo o cuenta por pagar</small></span></button>
     <button class="opcion-add" data-a="compra"><span class="ico" style="background:#8b5cf62e">🛒</span><span><b>Compra</b><small>Anotar un gasto que ya hiciste</small></span></button>
@@ -238,7 +291,8 @@ export function menuAgregar(ctx, abrirMensaje) {
     b.onclick = () => {
       m.cerrar();
       const a = b.dataset.a;
-      if (a === 'comp') ctx.ir('inicio', { vista: 'compromiso' });
+      if (a === 'asis') asistente(ctx);
+      else if (a === 'comp') ctx.ir('inicio', { vista: 'compromiso' });
       else if (a === 'deuda') ctx.ir('deudas', { vista: 'form' });
       else if (a === 'compra') ctx.ir('compras', { vista: 'compra' });
       else abrirMensaje();
@@ -248,17 +302,18 @@ export function menuAgregar(ctx, abrirMensaje) {
 
 /* ================= Formulario ================= */
 
-export function formulario(ctx, c, id) {
+export function formulario(ctx, c, id, borrador) {
   const e = ctx.sesion().estado;
   const comp = id ? e.compromisos.find((x) => x.id === id) : null;
   if (id && !comp) return ctx.ir('inicio', null);
   const hoyISO = aISO(new Date());
+  const b = comp ? null : borrador || null;
   const s = {
-    tipo: comp ? comp.tipo : 'gasto',
-    categoriaId: comp ? comp.categoriaId : null,
-    frecuencia: comp ? comp.frecuencia : 'mensual'
+    tipo: comp ? comp.tipo : (b && b.tipo) || 'gasto',
+    categoriaId: comp ? comp.categoriaId : (b && b.categoriaId) || null,
+    frecuencia: comp ? comp.frecuencia : (b && b.frecuencia) || 'mensual'
   };
-  const v = comp || { nombre: '', monto: 0, inicio: hoyISO, fin: null, avisoDias: 1, nota: '', espacioId: K.espacioActivo(e).id };
+  const v = comp || { nombre: '', monto: 0, inicio: hoyISO, fin: null, avisoDias: 1, nota: '', espacioId: K.espacioActivo(e).id, ...(b || {}) };
   const aviso = v.avisoDias === null || v.avisoDias === undefined ? 'n' : String(v.avisoDias);
 
   c.innerHTML = `

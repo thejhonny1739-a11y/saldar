@@ -8,7 +8,7 @@ import * as deudasUI from './deudas-ui.js';
 import * as compromisosUI from './compromisos-ui.js';
 
 const app = document.getElementById('app');
-const VERSION_APP = '0.9.0';
+const VERSION_APP = '1.0.0';
 const LARGO_PIN = 6;
 const BLOQUEO_SEGUNDOS = 60; // se bloquea al volver tras estar tanto tiempo en segundo plano
 
@@ -202,7 +202,7 @@ function pantallaPrincipal() {
     if (sub.vista === 'detalle') deudasUI.detalle(ctx, cont, sub.id);
     else if (sub.vista === 'compra') comprasUI.formulario(ctx, cont, sub.id);
     else if (sub.vista === 'guia') comprasUI.guia(ctx, cont);
-    else if (sub.vista === 'compromiso') compromisosUI.formulario(ctx, cont, sub.id);
+    else if (sub.vista === 'compromiso') compromisosUI.formulario(ctx, cont, sub.id, sub.borrador);
     else deudasUI.formulario(ctx, cont, sub.id);
     cont.scrollTop = 0;
     return;

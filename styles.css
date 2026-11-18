@@ -345,3 +345,11 @@ nav button[data-tab] { min-width: 0; }
 .celda i { width: 9px; height: 9px; border-radius: 50%; display: block; }
 .mx-grupo { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 2px 6px; color: var(--morado); }
 .mx-grupo b { font-size: 15px; } .mx-grupo em { font-style: normal; font-size: 12px; color: var(--suave); }
+
+/* ---------- Asistente ---------- */
+.asis-titulo { font-size: clamp(22px, 7vw, 28px); line-height: 1.2; letter-spacing: -.5px; margin: 4px 0 14px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ejemplo { display: block; width: 100%; text-align: left; padding: 8px 4px; font-size: 14px; color: var(--texto); border-bottom: 1px solid var(--borde); }
+.ejemplo:last-child { border-bottom: 0; }
+.ejemplo:active { color: var(--menta); }
+.asis-txt { display: block; width: 100%; margin-top: 10px; padding: 13px 14px; font-size: 17px; font-family: inherit; color: var(--texto); background: var(--card); border: 1px solid var(--borde); border-radius: 14px; outline: none; resize: none; user-select: text; -webkit-user-select: text; }
+.asis-txt:focus { border-color: var(--morado); }
