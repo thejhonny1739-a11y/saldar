@@ -278,3 +278,30 @@ code { background: var(--card-2); padding: 1px 6px; border-radius: 6px; font-siz
 .badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--rosa); color: #fff; font-size: 12px; font-style: normal; font-weight: 700; display: grid; place-items: center; }
 .formulario .seg { margin-top: 12px; }
 .espacios > :first-child { margin-left: auto; } .espacios > :last-child { margin-right: auto; }
+
+/* ---------- Hoy: periodos, avatar, botón + ---------- */
+.avatar-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--grad); color: #fff; font-weight: 700; display: grid; place-items: center; flex: none; }
+.punto-aviso { width: 8px; height: 8px; border-radius: 50%; background: var(--rosa); align-self: flex-start; margin-left: -2px; }
+.periodos { display: flex; justify-content: center; gap: 6px; margin-bottom: 10px; }
+.periodos button { padding: 8px 12px; font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--suave); border-bottom: 2px solid transparent; }
+.periodos button.on { color: var(--texto); font-weight: 700; border-image: var(--grad) 1; }
+.chip-mes.anio { letter-spacing: 3px; font-size: 20px; font-weight: 700; color: var(--texto); }
+.mes-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 4px; border-bottom: 1px solid var(--borde); text-align: left; }
+.mes-fila.ahora .mes-nom { color: var(--menta); }
+.mes-nom { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 16px; font-weight: 600; }
+.mes-nom small { color: var(--suave); font-size: 12px; font-weight: 400; margin-top: 2px; }
+.mes-barra { flex: none; width: 36px; height: 4px; border-radius: 99px; background: var(--rosa); overflow: hidden; }
+.mes-barra span { display: block; height: 100%; background: var(--menta); }
+.mes-fila b { flex: none; min-width: 84px; text-align: right; font-size: clamp(13px, 4vw, 15px); white-space: nowrap; }
+.mes-fila b.menta { color: var(--menta); } .mes-fila b.rosa { color: var(--rosa); }
+.check.fijo { opacity: .8; }
+
+nav { position: relative; align-items: flex-end; }
+nav button[data-tab] { min-width: 0; }
+.fab { flex: none; width: 56px; height: 56px; margin: -26px 6px 2px; border-radius: 50%; background: var(--grad); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 22px rgba(255, 45, 120, .35), 0 0 0 5px var(--card); }
+.fab svg { width: 28px; height: 28px; stroke: #fff; fill: none; stroke-width: 2.4; stroke-linecap: round; }
+.fab:active { transform: scale(.94); }
+.opcion-add { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 4px; text-align: left; border-bottom: 1px solid var(--borde); }
+.opcion-add b { display: block; font-size: 17px; font-weight: 600; }
+.opcion-add small { display: block; color: var(--suave); font-size: 13px; margin-top: 2px; }
+.contenido { padding-bottom: 44px; }

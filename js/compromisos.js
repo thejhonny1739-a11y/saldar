@@ -1,5 +1,5 @@
 // Compromisos recurrentes (gastos e ingresos que se repiten), categorías y espacios. Lógica pura, sin pantalla.
-import { aISO, inicioDia } from './calculos.js';
+import { aISO, inicioDia, ocurrencia } from './calculos.js';
 
 export const FRECUENCIAS = [
   ['unico', 'Una vez'], ['semanal', 'Semanal'], ['quincenal', 'Quincenal'], ['mensual', 'Mensual'],
@@ -97,6 +97,34 @@ export function ocurrenciasMes(estado, espacioId, y, m, hoy = new Date()) {
     }
   }
   return res.sort((a, b) => a.fecha - b.fecha || a.c.nombre.localeCompare(b.c.nombre));
+}
+
+// Deudas con cuota y día de pago, como ocurrencias del mes con la misma forma que los compromisos.
+export function ocurrenciasDeudas(estado, espacioId, y, m, hoy = new Date()) {
+  const primero = (estado.espacios && estado.espacios[0] && estado.espacios[0].id) || null;
+  const res = [];
+  for (const d of estado.deudas || []) {
+    if (espacioId && (d.espacioId || primero) !== espacioId) continue;
+    const o = ocurrencia(d, estado, y, m, hoy);
+    if (!o) continue;
+    const pagado = o.estado === 'pagada';
+    res.push({
+      c: { id: d.id, nombre: d.nombre, tipo: 'gasto', frecuencia: 'mensual', categoriaId: 'tarjetas', esDeuda: true },
+      fecha: o.fecha, iso: aISO(o.fecha), monto: o.monto, tipo: 'gasto', pagado,
+      estado: pagado ? 'pagado' : (o.estado === 'vencida' || o.estado === 'omitida') ? 'vencido' : 'pendiente'
+    });
+  }
+  return res;
+}
+
+// Compromisos y cuotas de deudas entre dos fechas (incluidas), ordenados por fecha.
+export function ocurrenciasRango(estado, espacioId, desde, hasta, hoy = new Date()) {
+  const d0 = inicioDia(desde), d1 = inicioDia(hasta);
+  const res = [];
+  for (let f = new Date(d0.getFullYear(), d0.getMonth(), 1); f <= d1; f = new Date(f.getFullYear(), f.getMonth() + 1, 1)) {
+    res.push(...ocurrenciasMes(estado, espacioId, f.getFullYear(), f.getMonth(), hoy), ...ocurrenciasDeudas(estado, espacioId, f.getFullYear(), f.getMonth(), hoy));
+  }
+  return res.filter((o) => o.fecha >= d0 && o.fecha <= d1).sort((a, b) => a.fecha - b.fecha || a.c.nombre.localeCompare(b.c.nombre));
 }
 
 export function resumenMes(lista) {

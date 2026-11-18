@@ -50,7 +50,7 @@ export function lista(ctx, c) {
 
 /* ================= Leer un mensaje ================= */
 
-function modalPegar(ctx) {
+export function modalPegar(ctx) {
   const m = modal(`
     <h2>Leer un mensaje del banco</h2>
     <p class="nota" style="margin-top:0">Pega el SMS o correo de la compra. Saldar busca el monto, el comercio y la tarjeta, y te los muestra para que confirmes antes de guardar.</p>

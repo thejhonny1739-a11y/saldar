@@ -1,47 +1,44 @@
 // Pantallas de compromisos recurrentes, categorías y espacios.
 import { esc, pesos, fechaCorta, miles, enlazarMonto, modal } from './util.js';
-import { parseMonto, aISO } from './calculos.js';
+import { parseMonto, aISO, situacion } from './calculos.js';
 import * as K from './compromisos.js';
-import * as deudasUI from './deudas-ui.js';
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MES3 = MESES.map((m) => m.slice(0, 3));
 
-let segmento = 'compromisos'; // 'compromisos' | 'deudas'
-let vista = null;             // { y, m }
-let modo = 'balance';         // 'balance' | 'gastos' | 'ingresos'
-export const reiniciar = () => { vista = null; modo = 'balance'; };
-export const mostrar = (seg) => { segmento = seg; };
+let periodo = 'mensual'; // 'anual' | 'mensual' | 'semanal'
+let ancla = null;        // fecha de referencia del periodo que se está viendo
+let modo = 'balance';    // 'balance' | 'gastos' | 'ingresos'
+export const reiniciar = () => { ancla = null; periodo = 'mensual'; modo = 'balance'; };
 
 const ico = (cat, clase = '') => {
   const col = K.colorSeguro(cat.color);
   return `<span class="ico ${clase}" style="background:${col}2e;color:${col}">${esc(cat.icono)}</span>`;
 };
+const lunesDe = (f) => new Date(f.getFullYear(), f.getMonth(), f.getDate() - ((f.getDay() + 6) % 7));
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
-/* ================= Pestaña "Pagos": compromisos y deudas ================= */
-
-export function pagos(ctx, c) {
-  c.innerHTML = `
-    <div class="seg" id="seg">
-      <button data-s="compromisos" class="${segmento === 'compromisos' ? 'on' : ''}">Compromisos</button>
-      <button data-s="deudas" class="${segmento === 'deudas' ? 'on' : ''}">Deudas</button>
-    </div>
-    <div id="cuerpo"></div>`;
-  c.querySelectorAll('#seg button').forEach((b) => { b.onclick = () => { segmento = b.dataset.s; pagos(ctx, c); }; });
-  const cuerpo = c.querySelector('#cuerpo');
-  if (segmento === 'deudas') deudasUI.lista(ctx, cuerpo);
-  else compromisos(ctx, cuerpo);
+function rango(a) {
+  if (periodo === 'anual') return [new Date(a.getFullYear(), 0, 1), new Date(a.getFullYear(), 11, 31)];
+  if (periodo === 'semanal') { const l = lunesDe(a); return [l, new Date(l.getFullYear(), l.getMonth(), l.getDate() + 6)]; }
+  return [new Date(a.getFullYear(), a.getMonth(), 1), new Date(a.getFullYear(), a.getMonth() + 1, 0)];
 }
+const mover = (a, d) => (periodo === 'anual' ? new Date(a.getFullYear() + d, a.getMonth(), 1)
+  : periodo === 'semanal' ? new Date(a.getFullYear(), a.getMonth(), a.getDate() + 7 * d)
+  : new Date(a.getFullYear(), a.getMonth() + d, 1));
 
-function compromisos(ctx, c) {
-  const e = ctx.sesion().estado;
-  const hoy = new Date();
-  if (!vista) vista = { y: hoy.getFullYear(), m: hoy.getMonth() };
-  const { y, m } = vista;
+/* ================= Pestaña "Hoy" ================= */
+
+export function hoy(ctx, c) {
+  const s = ctx.sesion();
+  const e = s.estado;
+  const ahora = new Date();
+  if (!ancla) ancla = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
   const esp = K.espacioActivo(e);
-  const todas = K.ocurrenciasMes(e, esp.id, y, m, hoy);
+  const [desde, hasta] = rango(ancla);
+  const todas = K.ocurrenciasRango(e, esp.id, desde, hasta, ahora);
   const r = K.resumenMes(todas);
-  const pendientes = todas.filter((o) => !o.pagado).length;
+  const pendientes = todas.filter((o) => !o.pagado && o.fecha <= new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 7)).length;
 
   let grande, izq, der, parte;
   if (modo === 'gastos') {
@@ -53,44 +50,89 @@ function compromisos(ctx, c) {
   }
   const lista = todas.filter((o) => modo === 'balance' || (modo === 'gastos' ? o.tipo === 'gasto' : o.tipo === 'ingreso'));
 
-  const mm = (d) => { const f = new Date(y, m + d, 1); return f; };
-  const etiqueta = (f) => `${MES3[f.getMonth()]}${f.getFullYear() !== hoy.getFullYear() ? ' ' + String(f.getFullYear()).slice(2) : ''}`;
-  const actual = y !== hoy.getFullYear() ? `${MES3[m]} ${y}` : MESES[m];
+  /* Navegador del periodo */
+  let nav;
+  if (periodo === 'mensual') {
+    const et = (f) => `${MES3[f.getMonth()]}${f.getFullYear() !== ahora.getFullYear() ? ' ' + String(f.getFullYear()).slice(2) : ''}`;
+    const act = ancla.getFullYear() !== ahora.getFullYear() ? `${MES3[ancla.getMonth()]} ${ancla.getFullYear()}` : MESES[ancla.getMonth()];
+    nav = `<button class="chip-mes" data-d="-1">${esc(et(mover(ancla, -1)))}</button>
+      <button class="chip-mes act" id="hoy">${esc(act)}</button>
+      <button class="chip-mes" data-d="1">${esc(et(mover(ancla, 1)))}</button>`;
+  } else if (periodo === 'anual') {
+    nav = `<button class="chip-mes anio" id="hoy">${esc(String(ancla.getFullYear()).split('').join(' '))}</button>`;
+  } else {
+    const a = desde, b = hasta;
+    const t = a.getMonth() === b.getMonth() ? `${a.getDate()} – ${b.getDate()} ${MES3[b.getMonth()].toLowerCase()}` : `${a.getDate()} ${MES3[a.getMonth()].toLowerCase()} – ${b.getDate()} ${MES3[b.getMonth()].toLowerCase()}`;
+    nav = `<button class="chip-mes act" id="hoy">${esc(t)}</button>`;
+  }
 
-  let filas = '';
-  let semana = 0;
-  for (const o of lista) {
-    const s = K.semanaDelMes(o.fecha);
-    if (s !== semana) {
-      semana = s;
-      filas += `<div class="semana-t"><b>S.${s}</b><i></i><span>${lista.filter((x) => K.semanaDelMes(x.fecha) === s).length}</span></div>`;
-    }
+  /* Filas */
+  const fila = (o) => {
     const cat = K.categoriaDe(e, o.c);
     const colorFecha = o.estado === 'vencido' ? 'rosa' : o.estado === 'pagado' ? 'menta' : '';
-    filas += `
+    const dato = o.c.esDeuda ? `data-deuda="${esc(o.c.id)}"` : `data-id="${esc(o.c.id)}"`;
+    return `
       <div class="comp${o.pagado ? ' hecho' : ''}">
-        <button class="comp-main" data-id="${esc(o.c.id)}">
+        <button class="comp-main" ${dato}>
           ${ico(cat)}
           <span class="comp-txt"><b>${esc(o.c.nombre)}</b>
-            <span class="comp-meta"><i class="chip ${colorFecha}">${esc(fechaCorta(o.fecha))}</i><span>${esc(K.nombreFrecuencia(o.c.frecuencia))}</span></span></span>
+            <span class="comp-meta"><i class="chip ${colorFecha}">${esc(fechaCorta(o.fecha))}</i><span>${o.c.esDeuda ? 'Deuda' : esc(K.nombreFrecuencia(o.c.frecuencia))}</span></span></span>
           <span class="pill ${o.tipo === 'ingreso' ? 'ing' : ''}">${o.tipo === 'ingreso' ? '+' : '−'} ${pesos(o.monto)}</span>
         </button>
-        <button class="check${o.pagado ? ' on' : ''}" data-id="${esc(o.c.id)}" data-iso="${o.iso}" aria-label="${o.tipo === 'ingreso' ? 'Marcar como recibido' : 'Marcar como pagado'}">${o.pagado ? '✓' : ''}</button>
+        ${o.c.esDeuda
+          ? `<span class="check fijo${o.pagado ? ' on' : ''}" title="Se registra con un abono">${o.pagado ? '✓' : ''}</span>`
+          : `<button class="check${o.pagado ? ' on' : ''}" data-id="${esc(o.c.id)}" data-iso="${o.iso}" aria-label="${o.tipo === 'ingreso' ? 'Marcar como recibido' : 'Marcar como pagado'}">${o.pagado ? '✓' : ''}</button>`}
       </div>`;
+  };
+
+  let cuerpo = '';
+  if (periodo === 'anual') {
+    cuerpo = MESES.map((nom, i) => {
+      const del = todas.filter((o) => o.fecha.getMonth() === i);
+      const rm = K.resumenMes(del);
+      const val = modo === 'gastos' ? rm.gastos : modo === 'ingresos' ? rm.ingresos : rm.ingresos - rm.gastos;
+      const esAhora = ancla.getFullYear() === ahora.getFullYear() && i === ahora.getMonth();
+      const total = rm.ingresos + rm.gastos;
+      const pc = total ? Math.round((rm.ingresos / total) * 100) : 0;
+      return `<button class="mes-fila${esAhora ? ' ahora' : ''}" data-mes="${i}">
+        <span class="mes-nom">${nom}<small>${del.length ? `${del.length} ${del.length === 1 ? 'movimiento' : 'movimientos'}` : 'Sin movimientos'}</small></span>
+        <span class="mes-barra"><span style="width:${pc}%"></span></span>
+        <b class="${val < 0 ? 'rosa' : modo === 'balance' || modo === 'ingresos' ? 'menta' : ''}">${del.length ? pesos(val) : '—'}</b></button>`;
+    }).join('');
+  } else if (lista.length === 0) {
+    cuerpo = `<div class="card vacio"><b>Nada por aquí</b>${(e.compromisos || []).length || e.deudas.length ? 'No hay movimientos en este periodo.' : 'Toca el botón + para crear tu primer compromiso: la luz, el arriendo, tu salario… Se repite solo.'}</div>`;
+  } else if (periodo === 'semanal') {
+    let dia = '';
+    for (const o of lista) {
+      if (o.iso !== dia) {
+        dia = o.iso;
+        const esHoy = o.iso === aISO(ahora);
+        cuerpo += `<div class="semana-t"><b>${esc(cap(o.fecha.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric' })))}</b>${esHoy ? '<span class="insignia" style="margin:0">Hoy</span>' : ''}<i></i></div>`;
+      }
+      cuerpo += fila(o);
+    }
+  } else {
+    let sem = 0;
+    for (const o of lista) {
+      const n = K.semanaDelMes(o.fecha);
+      if (n !== sem) { sem = n; cuerpo += `<div class="semana-t"><b>S.${n}</b><i></i><span>${lista.filter((x) => K.semanaDelMes(x.fecha) === n).length}</span></div>`; }
+      cuerpo += fila(o);
+    }
   }
+
+  /* Avisos y deudas */
+  const sit = e.deudas.map((d) => situacion(d, e, ahora));
+  const vencidas = sit.filter((x) => x.pendiente > 0 && x.vencida).length;
+  const respaldoViejo = e.deudas.length + e.compromisos.length > 0 && (!e.ajustes.ultimoRespaldo || Date.now() - e.ajustes.ultimoRespaldo > 7 * 86400000);
+  const totalDeuda = e.deudas.reduce((t, d) => t + (d.saldo || 0), 0);
 
   c.innerHTML = `
     <div class="encabezado">
-      <button class="espacio-chip" id="espacio">${ico(esp, 'peq')}<b>${esc(esp.nombre)}</b><span class="flecha-txt">›</span></button>
-      ${pendientes ? `<span class="insignia" style="margin:0">${pendientes} por resolver</span>` : ''}
+      <button class="espacio-chip" id="espacio">${ico(esp, 'peq')}<b>${esc(esp.nombre)}</b><span class="flecha-txt">›</span>${pendientes ? `<em class="punto-aviso" title="Pendientes esta semana"></em>` : ''}</button>
+      <button class="avatar-btn" id="perfil" aria-label="Ajustes">${esc((s.nombre.trim()[0] || '?').toUpperCase())}</button>
     </div>
-    <div class="meses">
-      <button class="flecha" id="ant" aria-label="Mes anterior">‹</button>
-      <button class="chip-mes" data-d="-1">${esc(etiqueta(mm(-1)))}</button>
-      <button class="chip-mes act" id="hoy">${esc(actual)}</button>
-      <button class="chip-mes" data-d="1">${esc(etiqueta(mm(1)))}</button>
-      <button class="flecha" id="sig" aria-label="Mes siguiente">›</button>
-    </div>
+    <div class="periodos">${[['anual', 'Anual'], ['mensual', 'Mensual'], ['semanal', 'Semanal']].map(([k, t]) => `<button data-p="${k}" class="${periodo === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div class="meses"><button class="flecha" id="ant" aria-label="Anterior">‹</button>${nav}<button class="flecha" id="sig" aria-label="Siguiente">›</button></div>
     <div class="modos">${[['balance', 'Balance'], ['gastos', 'Gastos'], ['ingresos', 'Ingresos']].map(([k, t]) => `<button data-modo="${k}" class="${modo === k ? 'on' : ''}">${t}</button>`).join('')}</div>
     <div class="gran${grande < 0 ? ' neg' : ''}">${pesos(grande)}</div>
     <div class="barra-prop"><span style="width:${Math.round(parte * 100)}%"></span></div>
@@ -98,19 +140,30 @@ function compromisos(ctx, c) {
       <div><span class="etiqueta">${izq[0]}</span><b class="${izq[2]}">${pesos(izq[1])}</b></div>
       <div><span class="etiqueta">${der[0]}</span><b class="${der[2]}">${pesos(der[1])}</b></div>
     </div>
-    <button class="btn" id="nuevo" style="max-width:none;margin:4px 0 6px">Nuevo compromiso</button>
-    ${lista.length === 0 ? `<div class="card vacio"><b>Nada por aquí</b>${(e.compromisos || []).length ? 'No hay compromisos en este mes.' : 'Crea tu primer compromiso: la luz, el arriendo, tu salario… Se repite solo cada mes.'}</div>` : filas}`;
+    ${vencidas ? `<div class="alerta">Tienes ${vencidas} ${vencidas === 1 ? 'pago de deuda vencido' : 'pagos de deudas vencidos'}.</div>` : ''}
+    ${respaldoViejo ? '<button class="alerta info" id="resp">Haz un respaldo de tus datos: toca aquí.</button>' : ''}
+    ${cuerpo}
+    ${e.deudas.length ? `<div class="seccion">Tus deudas</div>
+      <button class="deuda" id="verdeudas"><div class="deuda-top"><span class="deuda-nombre">Total adeudado</span><span class="deuda-monto">${pesos(totalDeuda)}</span></div>
+      <div class="deuda-sub">${e.deudas.filter((d) => d.saldo > 0).length} activas · ver todas</div></button>` : ''}`;
 
-  const ir = (d) => { const f = mm(d); vista = { y: f.getFullYear(), m: f.getMonth() }; compromisos(ctx, c); };
-  c.querySelector('#ant').onclick = () => ir(-1);
-  c.querySelector('#sig').onclick = () => ir(1);
-  c.querySelectorAll('.chip-mes[data-d]').forEach((b) => { b.onclick = () => ir(Number(b.dataset.d)); });
-  c.querySelector('#hoy').onclick = () => { vista = null; compromisos(ctx, c); };
-  c.querySelectorAll('.modos button').forEach((b) => { b.onclick = () => { modo = b.dataset.modo; compromisos(ctx, c); }; });
-  c.querySelector('#nuevo').onclick = () => ctx.ir('deudas', { vista: 'compromiso' });
-  c.querySelector('#espacio').onclick = () => modalEspacios(ctx, () => compromisos(ctx, c));
-  c.querySelectorAll('.comp-main').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'compromiso', id: b.dataset.id }); });
-  c.querySelectorAll('.check').forEach((b) => {
+  const nuevaAncla = (f) => { ancla = f; hoy(ctx, c); };
+  c.querySelector('#ant').onclick = () => nuevaAncla(mover(ancla, -1));
+  c.querySelector('#sig').onclick = () => nuevaAncla(mover(ancla, 1));
+  c.querySelectorAll('.chip-mes[data-d]').forEach((b) => { b.onclick = () => nuevaAncla(mover(ancla, Number(b.dataset.d))); });
+  c.querySelector('#hoy').onclick = () => nuevaAncla(new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
+  c.querySelectorAll('.periodos button').forEach((b) => { b.onclick = () => { periodo = b.dataset.p; hoy(ctx, c); }; });
+  c.querySelectorAll('.modos button').forEach((b) => { b.onclick = () => { modo = b.dataset.modo; hoy(ctx, c); }; });
+  c.querySelectorAll('.mes-fila').forEach((b) => { b.onclick = () => { periodo = 'mensual'; ancla = new Date(ancla.getFullYear(), Number(b.dataset.mes), 1); hoy(ctx, c); }; });
+  c.querySelector('#espacio').onclick = () => modalEspacios(ctx, () => hoy(ctx, c));
+  c.querySelector('#perfil').onclick = () => ctx.ir('ajustes', null);
+  const resp = c.querySelector('#resp');
+  if (resp) resp.onclick = () => ctx.ir('ajustes', null);
+  const vd = c.querySelector('#verdeudas');
+  if (vd) vd.onclick = () => ctx.ir('deudas', null);
+  c.querySelectorAll('.comp-main[data-id]').forEach((b) => { b.onclick = () => ctx.ir('inicio', { vista: 'compromiso', id: b.dataset.id }); });
+  c.querySelectorAll('.comp-main[data-deuda]').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'detalle', id: b.dataset.deuda }); });
+  c.querySelectorAll('button.check').forEach((b) => {
     b.onclick = async () => {
       const comp = e.compromisos.find((x) => x.id === b.dataset.id);
       if (!comp) return;
@@ -118,7 +171,30 @@ function compromisos(ctx, c) {
       if (comp.cumplidos[b.dataset.iso]) delete comp.cumplidos[b.dataset.iso];
       else comp.cumplidos[b.dataset.iso] = Date.now();
       try { await ctx.guardar(); } catch { return; }
-      compromisos(ctx, c);
+      hoy(ctx, c);
+    };
+  });
+}
+
+/* ================= Botón + ================= */
+
+export function menuAgregar(ctx, abrirMensaje) {
+  const m = modal(`
+    <h2>¿Qué quieres agregar?</h2>
+    <button class="opcion-add" data-a="comp"><span class="ico" style="background:#00d4a02e">🔁</span><span><b>Compromiso</b><small>Un gasto o ingreso que se repite</small></span></button>
+    <button class="opcion-add" data-a="deuda"><span class="ico" style="background:#ff2d782e">💳</span><span><b>Deuda</b><small>Tarjeta, préstamo o cuenta por pagar</small></span></button>
+    <button class="opcion-add" data-a="compra"><span class="ico" style="background:#8b5cf62e">🛒</span><span><b>Compra</b><small>Anotar un gasto que ya hiciste</small></span></button>
+    <button class="opcion-add" data-a="msg"><span class="ico" style="background:#ffb0202e">✉️</span><span><b>Mensaje del banco</b><small>Pegar un SMS o correo y leerlo</small></span></button>
+    <button class="volver" id="no" type="button" style="width:100%">Cancelar</button>`);
+  m.el.querySelector('#no').onclick = m.cerrar;
+  m.el.querySelectorAll('.opcion-add').forEach((b) => {
+    b.onclick = () => {
+      m.cerrar();
+      const a = b.dataset.a;
+      if (a === 'comp') ctx.ir('inicio', { vista: 'compromiso' });
+      else if (a === 'deuda') ctx.ir('deudas', { vista: 'form' });
+      else if (a === 'compra') ctx.ir('compras', { vista: 'compra' });
+      else abrirMensaje();
     };
   });
 }
@@ -128,7 +204,7 @@ function compromisos(ctx, c) {
 export function formulario(ctx, c, id) {
   const e = ctx.sesion().estado;
   const comp = id ? e.compromisos.find((x) => x.id === id) : null;
-  if (id && !comp) return ctx.ir('deudas', null);
+  if (id && !comp) return ctx.ir('inicio', null);
   const hoyISO = aISO(new Date());
   const s = {
     tipo: comp ? comp.tipo : 'gasto',
@@ -205,7 +281,7 @@ export function formulario(ctx, c, id) {
   c.querySelector('#frecs .sel')?.scrollIntoView({ inline: 'center', block: 'nearest' });
 
   c.querySelector('#gestionar').onclick = () => gestionarCategorias(ctx, () => pintarCats());
-  c.querySelector('#atras').onclick = () => ctx.ir('deudas', null);
+  c.querySelector('#atras').onclick = () => ctx.ir('inicio', null);
 
   if (comp) {
     c.querySelector('#borrar').onclick = async () => {
@@ -213,7 +289,7 @@ export function formulario(ctx, c, id) {
       e.compromisos = e.compromisos.filter((x) => x.id !== comp.id);
       try { await ctx.guardar(); } catch { return; }
       ctx.aviso('Compromiso eliminado');
-      ctx.ir('deudas', null);
+      ctx.ir('inicio', null);
     };
   }
 
@@ -236,7 +312,7 @@ export function formulario(ctx, c, id) {
     else e.compromisos.push({ id: crypto.randomUUID(), ...nuevo, creada: Date.now(), cumplidos: {} });
     try { await ctx.guardar(); } catch { return; }
     ctx.aviso(comp ? 'Cambios guardados' : 'Compromiso creado');
-    ctx.ir('deudas', null);
+    ctx.ir('inicio', null);
   };
 }
 

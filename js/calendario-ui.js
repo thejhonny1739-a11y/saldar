@@ -100,7 +100,7 @@ export function calendario(ctx, c) {
     b.onclick = () => { const n = Number(b.dataset.dia); vista.dia = vista.dia === n ? null : n; calendario(ctx, c); };
   });
   c.querySelectorAll('.deuda[data-id]').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'detalle', id: b.dataset.id }); });
-  c.querySelectorAll('.deuda[data-comp]').forEach((b) => { b.onclick = () => ctx.ir('deudas', { vista: 'compromiso', id: b.dataset.comp }); });
+  c.querySelectorAll('.deuda[data-comp]').forEach((b) => { b.onclick = () => ctx.ir('inicio', { vista: 'compromiso', id: b.dataset.comp }); });
 
   const guardarRec = async () => {
     e.ajustes.recordatorio = { diasAntes: Number(c.querySelector('#antes').value), hora: Number(c.querySelector('#hora').value) };

@@ -230,6 +230,7 @@ export function formulario(ctx, c, id) {
       <label>Nombre<input name="nombre" maxlength="40" value="${esc(v.nombre)}" placeholder="Ej: Tarjeta Visa" autocomplete="off" required></label>
       <label>Acreedor (opcional)<input name="acreedor" maxlength="40" value="${esc(v.acreedor)}" placeholder="Banco, tienda o persona" autocomplete="off"></label>
       <label>Tipo<select name="tipo">${TIPOS.map((t) => `<option${t === v.tipo ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+      ${e.espacios && e.espacios.length > 1 ? `<label>Espacio<select name="espacio">${e.espacios.map((x) => `<option value="${esc(x.id)}"${x.id === (v.espacioId || e.espacios[0].id) ? ' selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>` : ''}
       <label>Monto original<input name="montoOriginal" data-monto inputmode="numeric" value="${miles(v.montoOriginal)}" placeholder="0" autocomplete="off" required></label>
       <label>Saldo actual<input name="saldo" data-monto inputmode="numeric" value="${d ? miles(v.saldo) : ''}" placeholder="${d ? '0' : 'Igual al monto original'}" autocomplete="off"></label>
       <div class="dos">
@@ -255,6 +256,7 @@ export function formulario(ctx, c, id) {
       nombre: f.nombre.value.trim(), acreedor: f.acreedor.value.trim(), tipo: f.tipo.value,
       montoOriginal, saldo, tasa: C.parseTasa(f.tasa.value), cuota: C.parseMonto(f.cuota.value), dia, notas: f.notas.value.trim()
     };
+    if (f.espacio) nuevo.espacioId = f.espacio.value;
     if (!nuevo.nombre) { err.textContent = 'Escribe un nombre.'; return; }
     if (montoOriginal <= 0) { err.textContent = 'El monto original debe ser mayor a cero.'; return; }
     if (f.dia.value.trim() !== '' && (dia < 1 || dia > 31)) { err.textContent = 'El día de pago debe estar entre 1 y 31.'; return; }
