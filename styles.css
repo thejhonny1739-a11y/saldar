@@ -79,9 +79,9 @@ input { font: inherit; color: inherit; user-select: text; -webkit-user-select: t
 .puntos.error .punto { border-color: var(--rosa); background: var(--rosa); }
 .puntos.error { animation: sacudir .35s; }
 @keyframes sacudir { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
-.teclado { display: grid; grid-template-columns: repeat(3, 76px); gap: 14px 22px; }
+.teclado { --tk: clamp(58px, 19vw, 76px); display: grid; grid-template-columns: repeat(3, var(--tk)); gap: clamp(10px, 3vw, 14px) clamp(14px, 5vw, 22px); }
 .tecla {
-  width: 76px; height: 76px; border-radius: 50%; background: var(--card);
+  width: var(--tk); height: var(--tk); border-radius: 50%; background: var(--card);
   font-size: 28px; font-weight: 500; display: grid; place-items: center;
 }
 .tecla:active { background: var(--card-2); }
@@ -97,12 +97,13 @@ input { font: inherit; color: inherit; user-select: text; -webkit-user-select: t
 .saludo { color: var(--suave); margin: 0 0 20px; }
 .card { background: var(--card); border-radius: var(--radio); padding: 18px; margin-bottom: 14px; border: 1px solid var(--borde); }
 .etiqueta { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--suave); }
-.cifra { font-size: 34px; font-weight: 700; margin-top: 6px; letter-spacing: -.5px; }
+.cifra { overflow-wrap: anywhere; font-size: clamp(26px, 8.5vw, 34px); font-weight: 700; margin-top: 6px; letter-spacing: -.5px; }
 .fila { display: flex; gap: 12px; }
 .fila > .card { flex: 1; margin-bottom: 14px; }
 .mini .etiqueta.menta { color: var(--menta); }
 .mini .etiqueta.rosa { color: var(--rosa); }
-.mini .cifra { font-size: 22px; }
+.mini { padding: 16px 14px; }
+.mini .cifra { white-space: nowrap; overflow-wrap: normal; font-size: clamp(14px, 4.9vw, 22px); }
 .vacio { text-align: center; color: var(--suave); padding: 28px 18px; line-height: 1.5; }
 .vacio b { color: var(--texto); display: block; margin-bottom: 6px; font-size: 17px; }
 .insignia {
@@ -177,19 +178,20 @@ nav button.activo { color: var(--menta); }
 /* ---------- Calendario ---------- */
 .mes-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 18px; }
 .flecha { width: 40px; height: 40px; border-radius: 50%; background: var(--card-2); font-size: 24px; line-height: 1; }
-.semana, .cuadricula { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.semana, .cuadricula { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cuadricula { grid-auto-rows: 52px; }
 .semana { margin-bottom: 6px; text-align: center; font-size: 12px; color: var(--suave); }
-.dia { aspect-ratio: 1 / 1.05; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 15px; background: transparent; }
+.dia { position: relative; min-width: 0; height: 52px; padding: 8px 0 0; text-align: center; border-radius: 12px; font-size: 15px; background: transparent; border: 1.5px solid transparent; }
 .dia.vacio { pointer-events: none; }
 .dia:active { background: var(--card-2); }
 .dia.hoy { border: 1.5px solid var(--menta); }
 .dia.sel { background: var(--card-2); border: 1.5px solid var(--morado); }
-.puntos-dia { display: flex; gap: 3px; height: 6px; }
+.puntos-dia { position: absolute; left: 0; right: 0; bottom: 7px; display: flex; justify-content: center; gap: 3px; height: 6px; }
 .puntos-dia i, .leyenda i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .p-menta { background: var(--menta); } .p-rosa { background: var(--rosa); } .p-ambar { background: var(--ambar); } .p-morado { background: var(--morado); }
 .deuda-pie.morado { color: #b79cff; }
 .leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 12px; font-size: 12px; color: var(--suave); align-items: center; }
-.leyenda i { margin-right: -8px; }
+.ley { display: inline-flex; align-items: center; gap: 6px; }
 .sel-chico { padding: 8px 10px; font-size: 16px; color: var(--texto); background: var(--card-2); border: 1px solid var(--borde); border-radius: 10px; appearance: none; -webkit-appearance: none; }
 
 /* Pantallas anchas (iPad, escritorio): columna centrada como en el teléfono */

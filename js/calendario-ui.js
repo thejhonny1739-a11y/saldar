@@ -57,7 +57,7 @@ export function calendario(ctx, c) {
       </div>
       <div class="semana">${DIAS.map((d) => `<span>${d}</span>`).join('')}</div>
       <div class="cuadricula">${celdas}</div>
-      <div class="leyenda"><i class="p-menta"></i>Pagada <i class="p-ambar"></i>Por pagar <i class="p-rosa"></i>Vencida <i class="p-morado"></i>Programada</div>
+      <div class="leyenda"><span class="ley"><i class="p-menta"></i>Pagada</span><span class="ley"><i class="p-ambar"></i>Por pagar</span><span class="ley"><i class="p-rosa"></i>Vencida</span><span class="ley"><i class="p-morado"></i>Programada</span></div>
     </div>
     <div class="seccion">${vista.dia ? `Pagos del ${vista.dia} de ${MESES[m].toLowerCase()}` : `Pagos de ${MESES[m].toLowerCase()}`}${!vista.dia && porPagar ? ` · por pagar ${pesos(porPagar)}` : ''}</div>
     ${visibles.length === 0
